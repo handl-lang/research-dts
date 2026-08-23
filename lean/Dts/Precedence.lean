@@ -1,5 +1,9 @@
 import Mathlib.Tactic
+import Mathlib.Logic.Relation
+import Mathlib.Order.Defs.Unbundled
 import Dts.Basic
+
+set_option linter.style.haveILetI false
 
 namespace TopologySynthesis
 
@@ -8,6 +12,9 @@ namespace TopologySynthesis
 /-- Precedence is a relation on handlers (not just their names),
     matching the types used by `synthesize` and `AppearsBefore`. -/
 def Precedence := Handler → Handler → Bool
+
+/-- The `Prop`-valued reading of a `Bool` precedence relation. -/
+def precRel (r : Precedence) (a b : Handler) : Prop := r a b = true
 
 def Precedence.irreflexive (r : Precedence) : Prop := ∀ h, ¬ r h h = true
 def Precedence.transitive (r : Precedence) : Prop :=
@@ -25,29 +32,33 @@ def Precedence.isPartialOrder (r : Precedence) : Prop :=
 theorem irreflexive_transitive_implies_asymmetric
     (r : Precedence) (hirr : Precedence.irreflexive r)
     (htr : Precedence.transitive r) : Precedence.asymmetric r := by
-  intro a b hab hba
-  exact absurd (htr a b a hab hba) (hirr a)
+  haveI : IsTrans Handler (precRel r) := ⟨fun _ _ _ hab hbc => htr _ _ _ hab hbc⟩
+  haveI : Std.Irrefl (precRel r) := ⟨hirr⟩
+  haveI ha : Std.Asymm (precRel r) := by infer_instance
+  intro a b hab
+  exact ha.asymm a b hab
 
-inductive Reachable (r : Precedence) : Handler → Handler → Prop where
-  | one (a b : Handler) (h : r a b = true) : Reachable r a b
-  | reach_trans (a b c : Handler) (h1 : Reachable r a b) (h2 : Reachable r b c) :
-    Reachable r a c
+/-- Reachability in the precedence relation is the transitive closure. -/
+def Reachable (r : Precedence) : Handler → Handler → Prop :=
+  Relation.TransGen (precRel r)
 
 def Precedence.acyclic (r : Precedence) : Prop := ∀ h, ¬ Reachable r h h
 
+/-- The transitive closure of a transitive relation is contained in the
+    relation itself. -/
 theorem reachable_implies_edge
     (r : Precedence) (htr : Precedence.transitive r)
     (a b : Handler) (reach : Reachable r a b) : r a b = true := by
-  induction reach with
-  | one _ _ h => exact h
-  | reach_trans _ _ _ _ _ ih1 ih2 => exact htr _ _ _ ih1 ih2
+  haveI : IsTrans Handler (precRel r) := ⟨fun _ _ _ hab hbc => htr _ _ _ hab hbc⟩
+  simpa [Reachable, precRel, Relation.transGen_eq_self (r := precRel r)] using reach
 
 /-- **Proposition 0**: A partial order (irreflexive + transitive) is acyclic. -/
 theorem partialOrder_acyclic
     (r : Precedence) (hpo : Precedence.isPartialOrder r) :
     Precedence.acyclic r := by
   obtain ⟨h_irrefl, h_tr⟩ := hpo
+  haveI : IsTrans Handler (precRel r) := ⟨fun _ _ _ hab hbc => h_tr _ _ _ hab hbc⟩
   intro h h_cycle
-  exact absurd (reachable_implies_edge r h_tr h h h_cycle) (h_irrefl h)
+  exact h_irrefl h (by simpa [Reachable, precRel, Relation.transGen_eq_self (r := precRel r)] using h_cycle)
 
 end TopologySynthesis

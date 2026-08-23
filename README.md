@@ -1,78 +1,100 @@
 # Declarative Topology Synthesis (DTS)
 
-Lean 4 formalization of correctness proofs for declarative handler topology synthesis in Sanada's arrow calculus with algebraic effects.
+Research project on **declarative handler topology synthesis** for functional programming languages with algebraic effects and handlers. The central goal is to let programmers specify *which handler wraps which* as a precedence relation, and have the compiler synthesize the correct nested `handle` structure statically.
+
+This is a practical language-design problem: in effect systems with explicit handler nesting, the programmer often knows the desired precedence (e.g., "Auth must be inside Cache") but must still write the nesting by hand. DTS proposes a compile-time synthesis pass that converts a declarative specification into a linearly nested handler expression.
+
+The project combines a research paper, a machine-checked formalization, and reference tooling/case studies.
 
 ## The problem
 
-In Sanada's arrow calculus, **handler topology** — which handler wraps which — must be written explicitly by the programmer:
+In effect-handler languages that use nested `handle` constructs, the programmer writes the topology explicitly:
 
 ```
 handle (handle (handle body H1) H2) H3
 ```
 
-This is tedious and error-prone. The programmer knows *what* precedence they want (e.g., "H1 must be inside H2"), but has to manually figure out the correct nesting.
+This is tedious and error-prone. The programmer knows the desired precedence, but must manually work out the correct nesting order.
 
 ## The idea
 
-**Declarative topology synthesis**: the programmer specifies a *precedence relation* (a partial order on handlers), and the compiler automatically generates the correct nesting via a linear extension — a sorted list that respects all constraints.
+**Declarative topology synthesis**: the programmer supplies a precedence relation (a partial order over handlers), and the compiler computes a linear extension — a valid ordering — and folds it into the corresponding nested `handle` term.
 
 ```
 -- programmer writes:
-synthesize body [H1, H2, H3]  -- linear extension of the precedence
+synthesize body [H1, H2, H3]  -- a linear extension of the precedence
 
 -- compiler produces:
 handle (handle (handle body H1) H2) H3
 ```
 
-Arrow effects impose a **linear (sequence) structure** on operations — no runtime branching on commands — so a static linear ordering is sufficient. This is a compile-time problem, not a runtime dispatch problem.
+Because arrow effects impose a linear, sequential structure on operations, a static ordering is sufficient. Synthesis is a compile-time transformation, not a runtime dispatch mechanism.
 
-## What the Lean proofs verify
+## Project structure
 
-The formalization in `Dts/` proves that the synthesis algorithm is correct:
+This repository contains three complementary artifacts:
 
-| Theorem | What it proves | Why it matters |
-|---|---|---|
-| `irreflexive_transitive_implies_asymmetric` | Asymmetry is derivable from irreflexivity + transitivity | The precedence relation can't have both `a ≺ b` and `b ≺ a` |
-| `partialOrder_acyclic` | Partial orders are acyclic | The precedence relation can't have cycles — otherwise no valid nesting exists |
-| `synthesize_well_formed` | Synthesis preserves well-formedness (non-empty handler clauses) | The output isn't garbage — every handler actually handles something |
-| `synthesize_preserves_precedence` | If `hi` appears before `hj` in the list, `hi` is nested inside `hj` | **Core theorem**: the synthesized nesting respects the ordering |
-| `synthesize_static_topology` | Synthesis never introduces runtime branching (`cond`) | The output is still a valid arrow-effect term — no dynamic dispatch sneaks in |
-| `synthesize_completeness` | If the list is a linear extension of `prec`, every precedence constraint is realized | **Preservation + completeness = full correctness**: the synthesis does exactly what the precedence specification asks |
-| `exists_linear_extension` | For any finite acyclic precedence relation, a linear extension exists | **Topological sort soundness**: the compiler can always find a valid ordering |
-| `synthesize_eq_manuallyNested` | Synthesis produces the same term as explicit manual nesting | Syntactic equivalence: the fold is just sugar for manual nesting |
-| `synthesize_equiv_manuallyNested` | Synthesized and manually nested programs have identical traces | **Semantic equivalence**: behavior is preserved, not just structure |
-| `synthesize_commutative_two` | Two clause-disjoint handlers can be swapped without changing the trace | **Commutativity**: unordered handlers with disjoint operations are safe to reorder |
+### `PAPER.md`
 
-## Relevance to Language Design
+The research paper, "Declarative Handler Topology Synthesis for Arrow Effects." It presents:
 
-Any language with an AST that includes explicit handler nesting and a runtime that executes that nesting can benefit from this research. The DTS research shows that:
+- the declarative handler model and precedence relation;
+- the synthesis algorithm as topological sort + AST fold;
+- correctness properties (well-formedness, precedence preservation, staticity, semantic equivalence, commutativity for disjoint handlers);
+- an implementation strategy for arrow-effect languages that reuses existing handler AST nodes and runtimes.
 
-1. **A synthesis pass is possible** — it's a compile-time fold over a sorted handler list
-2. **It's provably correct** — the Lean proofs guarantee precedence preservation, well-formedness, staticity, semantic equivalence, and commutativity for disjoint handlers
-3. **It doesn't change the runtime** — the runtime still sees explicit `handle` nesting; only the frontend changes
+### `lean/`
 
-The paper at `PAPER.md` proposes this as a language design for arrow-effect languages with explicit handler nesting. The Lean file is the machine-verified evidence that the design is sound.
+A Lean 4 formalization of the paper's correctness claims. The proofs are machine-checked (the project builds with `lake build` and contains no admitted proofs).
 
-## Utility
+Relevant theorems include:
 
-- **For the language designer**: confidence that declarative handler ordering is safe to add
-- **For the implementer**: the `synthesize` function is a simple fold that wraps each handler around the body in order
-- **For the formalist**: the proofs are machine-checked by Lean 4 (`lake build` passes), not just pen-and-paper sketches
+- `synthesize_well_formed` — synthesis preserves well-formedness;
+- `synthesize_preserves_precedence` — the generated nesting respects the declared precedence;
+- `synthesize_static_topology` — synthesis introduces no runtime `cond` branching;
+- `synthesize_completeness` — every precedence constraint is realized;
+- `exists_linear_extension` — a topological sort is always available for finite acyclic relations;
+- `synthesize_equiv_manuallyNested` — synthesized and manually nested programs have identical traces;
+- `synthesize_commutative_two` — disjoint handlers can be reordered without changing behavior.
 
-## Build
+Build:
 
 ```sh
+cd lean
 lake build
 ```
 
-Requires Lean 4 (toolchain specified in `lean-toolchain`). Mathlib is used for tactic utilities only.
+### `python/`
 
-## Case study
+Python tooling and case studies for the research. Includes:
 
-A runnable HTTP middleware example is in `case_study/`:
+- a precedence parser and cycle-detection harness;
+- a working AST-to-AST synthesis pass;
+- case studies such as HTTP middleware pipelines and event-driven handler chains;
+- property-based and integration tests.
+
+Build:
 
 ```sh
-python3 case_study/http_middleware.py
+cd python
+uv run pytest
 ```
 
-It demonstrates the full pipeline: declarative spec (Auth → Cache → Logger) → topological sort → synthesized nesting → execution.
+### `project/`
+
+Implementation and evaluation tracking.
+
+## Relevance to functional programming
+
+Any functional language with an AST that includes explicit handler nesting and a runtime that executes that nesting can adopt this design. DTS shows that:
+
+1. **A synthesis pass is possible** — it is a compile-time fold over a topologically sorted handler list.
+2. **It is provably correct** — the paper argues the properties, and the Lean formalization verifies them mechanically.
+3. **It does not change the runtime** — the runtime still sees ordinary nested `handle` expressions; only the frontend grows a declarative layer.
+
+## Further reading
+
+- `PAPER.md` — full paper.
+- `lean/Dts/` — formalized definitions and proofs.
+- `python/tests/` — executable tests and case studies.
+- `project/TODO.md` — implementation and evaluation task list.

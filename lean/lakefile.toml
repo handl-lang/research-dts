@@ -1,6 +1,6 @@
 name = "dts"
 version = "0.1.0"
-defaultTargets = ["Dts"]
+defaultTargets = ["Dts", "ListDigraph"]
 
 [[require]]
 name = "mathlib"
@@ -9,3 +9,6 @@ rev = "v4.33.0"
 
 [[lean_lib]]
 name = "Dts"
+
+[[lean_lib]]
+name = "ListDigraph"

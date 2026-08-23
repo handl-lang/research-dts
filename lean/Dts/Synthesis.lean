@@ -1,8 +1,11 @@
 import Mathlib.Tactic
 import Dts.Basic
 import Dts.Precedence
+import ListDigraph.Basic
 
 namespace TopologySynthesis
+
+open ListDigraph
 
 -- Section 4: Synthesis
 
@@ -57,10 +60,6 @@ inductive NestedInside : Command → Handler → Handler → Prop where
     (h : NestedInside body inner mid) :
     NestedInside (Command.handle body outer) inner mid
 
-inductive AppearsBefore (a b : Handler) : List Handler → Prop where
-  | head (rest : List Handler) (h : b ∈ rest) : AppearsBefore a b (a :: rest)
-  | tail (h : Handler) (rest : List Handler) (h_ab : AppearsBefore a b rest) :
-    AppearsBefore a b (h :: rest)
 
 /-- Folding `rest` outside `cmd` preserves an existing nesting of
     `inner` inside `outer`. The target `outer` is NOT in the fold list. -/
