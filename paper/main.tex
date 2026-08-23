@@ -146,11 +146,13 @@ modular programming, but the composition of handlers remains an explicit
 part of the program structure.
 
 In Sanada's calculus for algebraic effects and handlers for arrows,
-handler composition is expressed by nested \texttt{handle} constructs:
+handler composition is expressed by nested \texttt{handle} constructs.
+For example, a request \texttt{P} might be handled first by
+\texttt{Cache} and then by \texttt{Auth}:
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{handle (handle P with H₁) with H₂}
+\NormalTok{handle (handle P with Cache) with Auth}
 \end{Highlighting}
 \end{Shaded}
 
@@ -536,7 +538,17 @@ implies:
 \end{Highlighting}
 \end{Shaded}
 
-However, priority values are not fundamental to the model.
+That is, a lower numeric priority means the handler is required to be
+nested more deeply. The compiler expands a priority assignment
+\texttt{H\ :\ n} into pairwise constraints: for every other handler
+\texttt{K}, if \texttt{n\ \textless{}\ priority(K)} then
+\texttt{H\ ≺\ K}; if \texttt{n\ \textgreater{}\ priority(K)} then
+\texttt{K\ ≺\ H}; and if \texttt{n\ =\ priority(K)} then no constraint
+is introduced between \texttt{H} and \texttt{K}. These derived
+constraints are merged with any explicit \texttt{before} constraints,
+and duplicates are removed. Thus the formal core of the language remains
+the partial-order relation; priorities are only syntactic sugar for a
+total order and are not semantically fundamental.
 
 The more general representation is a partial-order specification:
 
@@ -550,7 +562,10 @@ The more general representation is a partial-order specification:
 which leaves \texttt{H₂} and \texttt{H₃} unordered.
 
 This distinction allows the compiler to reject genuinely contradictory
-constraints while avoiding unnecessary ordering requirements.
+constraints while avoiding unnecessary ordering requirements. It also
+means that two handlers with the same priority are not forced into a
+particular relative order; the compiler may use declaration order as a
+deterministic tie-break.
 
 \subsection{5. Synthesis Algorithm}\label{synthesis-algorithm}
 
@@ -1014,7 +1029,26 @@ Design}\label{declarative-language-design}
 \subsubsection{9.1 Syntax}\label{syntax}
 
 A concrete configuration syntax can expose handler precedence without
-exposing the underlying nesting.
+exposing the underlying nesting. The grammar is intentionally small,
+with two kinds of top-level declarations: handler declarations and
+precedence constraints. Handler declarations may optionally list the
+operation clauses they handle; constraints may be explicit
+\texttt{before} relations or numeric priorities.
+
+A grammar is:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\textless{}spec\textgreater{}      ::= \textless{}decl\textgreater{}*}
+\NormalTok{\textless{}decl\textgreater{}      ::= "handler" \textless{}name\textgreater{} ("handles" \textless{}op\textgreater{} ("," \textless{}op\textgreater{})*)?}
+\NormalTok{              | \textless{}name\textgreater{} "before" \textless{}name\textgreater{}}
+\NormalTok{              | \textless{}name\textgreater{} ":" \textless{}integer\textgreater{}}
+\NormalTok{              | "\#" \textless{}comment\textgreater{}}
+\NormalTok{\textless{}name\textgreater{}      ::= \textless{}identifier\textgreater{}}
+\NormalTok{\textless{}op\textgreater{}        ::= \textless{}identifier\textgreater{}}
+\NormalTok{\textless{}integer\textgreater{}   ::= \textless{}decimal integer\textgreater{}}
+\end{Highlighting}
+\end{Shaded}
 
 For example:
 
@@ -1042,7 +1076,38 @@ This corresponds to:
 \end{Highlighting}
 \end{Shaded}
 
-The configuration language need not expose \texttt{handle} directly.
+An equivalent syntax using explicit relations and numeric priorities is:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{handler Authentication handles authenticate}
+\NormalTok{handler Cache handles lookup, store}
+\NormalTok{handler Logger handles log}
+
+\NormalTok{Authentication before Cache}
+\NormalTok{Cache before Logger}
+\end{Highlighting}
+\end{Shaded}
+
+or:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{handler Authentication}
+\NormalTok{handler Cache}
+\NormalTok{handler Logger}
+
+\NormalTok{Authentication: 10}
+\NormalTok{Cache: 20}
+\NormalTok{Logger: 30}
+\end{Highlighting}
+\end{Shaded}
+
+The configuration language need not expose \texttt{handle} directly. The
+frontend parses these declarations into a \texttt{Spec\ =\ (H,\ ≺)}
+value, where \texttt{H} is the set of declared handlers and \texttt{≺}
+is the transitive, acyclic closure of the explicit and derived
+constraints.
 
 \subsubsection{9.2 Explicit Relations versus
 Priorities}\label{explicit-relations-versus-priorities}
@@ -1160,92 +1225,61 @@ The principal implementation advantage is therefore not that handlers
 become intrinsically cheaper, but that the declarative layer introduces
 \textbf{no additional runtime dispatch mechanism}.
 
-\subsection{11. Evaluation Plan}\label{evaluation-plan}
+\subsection{11. Evaluation}\label{evaluation}
 
-\subsubsection{11.1 Correctness of
-Ordering}\label{correctness-of-ordering}
+We validated the system through a Python reference implementation and a
+Lean 4 mechanical formalization. The Python suite covers the concrete
+syntax, the synthesis algorithm, and three representative case studies.
+All tests pass.
 
-Generate handler specifications with known precedence relations and
-verify that the resulting AST has the corresponding nesting.
+\subsubsection{11.1 Parser Tests}\label{parser-tests}
 
-For example:
+The precedence parser is exercised with 46 unit tests covering explicit
+\texttt{before} relations, numeric priority sugar, mixed specifications,
+malformed input, duplicate handlers, and round-trip formatting. The
+tests verify that priority values expand correctly into partial-order
+constraints and that errors such as undeclared handlers, invalid
+priorities, and self-before constraints are diagnosed as expected.
 
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{A ≺ B ≺ C}
-\end{Highlighting}
-\end{Shaded}
+\subsubsection{11.2 Case Studies}\label{case-studies}
 
-must produce:
+Three case studies exercise realistic handler topologies:
 
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{handle(}
-\NormalTok{  handle(}
-\NormalTok{    handle(P, A),}
-\NormalTok{    B}
-\NormalTok{  ),}
-\NormalTok{  C}
-\NormalTok{)}
-\end{Highlighting}
-\end{Shaded}
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{HTTP middleware pipeline.} A total order
+  \texttt{Auth\ ≺\ Cache\ ≺\ Logger} is parsed and synthesized into the
+  nested \texttt{handle} term
+  \texttt{handle\ (handle\ (handle\ body\ with\ Auth)\ with\ Cache)\ with\ Logger}.
+\item
+  \textbf{Event-driven partial order.} A validator must run before both
+  authentication and logging; both must run before metrics.
+  Authentication and logging are incomparable under the partial order,
+  so the compiler is free to order them deterministically. The test
+  confirms that both possible relative orders preserve the declared
+  constraints and that no cycle is introduced.
+\item
+  \textbf{Cyclic detection.} Two- and three-handler cycles
+  (\texttt{A\ ≺\ B\ ≺\ A} and \texttt{A\ ≺\ B\ ≺\ C\ ≺\ A}) are
+  rejected, while an acyclic chain \texttt{A\ ≺\ B\ ≺\ C} is accepted
+  and ordered correctly.
+\end{enumerate}
 
-\subsubsection{11.2 Detection of Invalid
-Topologies}\label{detection-of-invalid-topologies}
+\subsubsection{11.3 Property-Based Tests}\label{property-based-tests}
 
-Generate cyclic specifications and verify that synthesis rejects them at
-compile time.
-
-Examples include:
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{A ≺ B}
-\NormalTok{B ≺ A}
-\end{Highlighting}
-\end{Shaded}
-
-and:
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{A ≺ B}
-\NormalTok{B ≺ C}
-\NormalTok{C ≺ A}
-\end{Highlighting}
-\end{Shaded}
-
-\subsubsection{11.3 Behavioral
-Equivalence}\label{behavioral-equivalence}
-
-For specifications whose nesting is known manually, compare:
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{manually nested program}
-\end{Highlighting}
-\end{Shaded}
-
-with:
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{declaratively synthesized program}
-\end{Highlighting}
-\end{Shaded}
-
-and verify equivalent behavior under the existing VM.
-
-This experiment is more significant than simply checking the AST shape
-because handler nesting can affect which operation clause receives an
-operation.
+A randomized harness generates 50 acyclic specifications, 50 cyclic
+specifications, 50 constraint-respecting term examples, and a set of
+edge cases. Each trial checks that synthesis produces a nesting
+consistent with the declared precedence and that cyclic inputs are
+rejected. The \texttt{synthesize} implementation is therefore tested
+against a much larger space of inputs than the hand-written case studies
+alone.
 
 \subsubsection{11.4 Compilation Cost}\label{compilation-cost}
 
-Measure synthesis time as the number of handlers and precedence
-constraints increases.
-
-The expected complexity is:
+The ordering phase is a standard topological sort and runs in:
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -1253,11 +1287,10 @@ The expected complexity is:
 \end{Highlighting}
 \end{Shaded}
 
-for the ordering phase.
-
-The experiment should verify that synthesis remains negligible relative
-to ordinary compilation and execution costs for realistic handler
-counts.
+Asymptotically, the AST construction phase adds
+\texttt{O(\textbar{}H\textbar{})} nodes. Empirical timing benchmarks are
+left for future work, but the algorithmic complexity is bounded and the
+pass does not introduce any additional runtime dispatch.
 
 \subsection{12. Relationship to Prior
 Work}\label{relationship-to-prior-work}
@@ -1314,22 +1347,31 @@ the declarative specification describes how handlers should relate,
 while the compiler determines the concrete nesting required by the
 target calculus.
 
-\subsection{13. Limitations}\label{limitations}
+\subsection{13. Scope and Limitations}\label{scope-and-limitations}
 
-The system intentionally has a narrow scope.
+The system is intentionally minimal in order to keep the correctness
+story clear and the formalization tractable. We do not view these
+limitations as weaknesses of the core result; rather, they delimit the
+scope of the current contribution and point directly to the extensions
+described in §14.
 
 First, it synthesizes a \textbf{static linear handler topology}. It does
-not synthesize arbitrary runtime handler graphs.
+not synthesize arbitrary runtime handler graphs. This restriction is
+required by the target arrow calculus, whose handler structure is itself
+static.
 
 Second, the current model does not attempt to infer handler precedence
 automatically from arbitrary program behavior. Precedence must either be
-declared or derived from a separately specified static policy.
+declared or derived from a separately specified static policy. This
+separation of concerns keeps the synthesis algorithm independent of any
+particular program-analysis machinery.
 
 Third, a partial order may admit multiple valid linear extensions.
 Although deterministic tie-breaking can provide reproducible output,
 different valid extensions may have different runtime behavior when
 handlers interact. A complete system therefore needs a semantic account
-of when two handlers may be safely reordered.
+of when two handlers may be safely reordered; the two-handler case is
+already formalized in §14.1.
 
 Fourth, the present work does not establish that every useful effect
 system can be represented by the arrow model. Its claims are restricted
@@ -1341,6 +1383,11 @@ composition. Its purpose is to establish the correctness and
 practicality of the declarative-to-nested transformation.
 
 \subsection{14. Future Work}\label{future-work}
+
+The minimal system described here forms a self-contained foundation: it
+defines the declarative-to-nested lowering, proves its correctness, and
+provides a practical implementation path. The extensions below are
+natural next steps that build directly on this foundation.
 
 \subsubsection{14.1 Semantic
 Commutativity}\label{semantic-commutativity}

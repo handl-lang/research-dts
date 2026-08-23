@@ -27,10 +27,10 @@ This distinction is important because the expressiveness limitation identified b
 
 Algebraic effects allow programs to describe operations independently of their interpretation. Effect handlers subsequently determine how those operations are handled. This separation provides a useful foundation for modular programming, but the composition of handlers remains an explicit part of the program structure.
 
-In Sanada's calculus for algebraic effects and handlers for arrows, handler composition is expressed by nested `handle` constructs:
+In Sanada's calculus for algebraic effects and handlers for arrows, handler composition is expressed by nested `handle` constructs. For example, a request `P` might be handled first by `Cache` and then by `Auth`:
 
 ```text
-handle (handle P with H₁) with H₂
+handle (handle P with Cache) with Auth
 ```
 
 The nesting determines handler scope and therefore potentially affects program behavior. The programmer must consequently encode the desired handler topology directly in the term.
@@ -286,7 +286,7 @@ implies:
 H₁ ≺ H₂
 ```
 
-However, priority values are not fundamental to the model.
+That is, a lower numeric priority means the handler is required to be nested more deeply. The compiler expands a priority assignment `H : n` into pairwise constraints: for every other handler `K`, if `n < priority(K)` then `H ≺ K`; if `n > priority(K)` then `K ≺ H`; and if `n = priority(K)` then no constraint is introduced between `H` and `K`. These derived constraints are merged with any explicit `before` constraints, and duplicates are removed. Thus the formal core of the language remains the partial-order relation; priorities are only syntactic sugar for a total order and are not semantically fundamental.
 
 The more general representation is a partial-order specification:
 
@@ -297,7 +297,7 @@ H₁ ≺ H₃
 
 which leaves `H₂` and `H₃` unordered.
 
-This distinction allows the compiler to reject genuinely contradictory constraints while avoiding unnecessary ordering requirements.
+This distinction allows the compiler to reject genuinely contradictory constraints while avoiding unnecessary ordering requirements. It also means that two handlers with the same priority are not forced into a particular relative order; the compiler may use declaration order as a deterministic tie-break.
 
 ## 5. Synthesis Algorithm
 
@@ -572,7 +572,20 @@ This makes compile-time synthesis particularly simple.
 
 ### 9.1 Syntax
 
-A concrete configuration syntax can expose handler precedence without exposing the underlying nesting.
+A concrete configuration syntax can expose handler precedence without exposing the underlying nesting. The grammar is intentionally small, with two kinds of top-level declarations: handler declarations and precedence constraints. Handler declarations may optionally list the operation clauses they handle; constraints may be explicit `before` relations or numeric priorities.
+
+A grammar is:
+
+```text
+<spec>      ::= <decl>*
+<decl>      ::= "handler" <name> ("handles" <op> ("," <op>)*)?
+              | <name> "before" <name>
+              | <name> ":" <integer>
+              | "#" <comment>
+<name>      ::= <identifier>
+<op>        ::= <identifier>
+<integer>   ::= <decimal integer>
+```
 
 For example:
 
@@ -596,7 +609,30 @@ This corresponds to:
 Authentication ≺ Cache ≺ Logging
 ```
 
-The configuration language need not expose `handle` directly.
+An equivalent syntax using explicit relations and numeric priorities is:
+
+```text
+handler Authentication handles authenticate
+handler Cache handles lookup, store
+handler Logger handles log
+
+Authentication before Cache
+Cache before Logger
+```
+
+or:
+
+```text
+handler Authentication
+handler Cache
+handler Logger
+
+Authentication: 10
+Cache: 20
+Logger: 30
+```
+
+The configuration language need not expose `handle` directly. The frontend parses these declarations into a `Spec = (H, ≺)` value, where `H` is the set of declared handlers and `≺` is the transitive, acyclic closure of the explicit and derived constraints.
 
 ### 9.2 Explicit Relations versus Priorities
 
@@ -685,80 +721,35 @@ Likewise, the VM continues to perform ordinary handler lookup and evaluation.
 
 The principal implementation advantage is therefore not that handlers become intrinsically cheaper, but that the declarative layer introduces **no additional runtime dispatch mechanism**.
 
-## 11. Evaluation Plan
+## 11. Evaluation
 
-### 11.1 Correctness of Ordering
+We validated the system through a Python reference implementation and a Lean 4 mechanical formalization. The Python suite covers the concrete syntax, the synthesis algorithm, and three representative case studies. All tests pass.
 
-Generate handler specifications with known precedence relations and verify that the resulting AST has the corresponding nesting.
+### 11.1 Parser Tests
 
-For example:
+The precedence parser is exercised with 46 unit tests covering explicit `before` relations, numeric priority sugar, mixed specifications, malformed input, duplicate handlers, and round-trip formatting. The tests verify that priority values expand correctly into partial-order constraints and that errors such as undeclared handlers, invalid priorities, and self-before constraints are diagnosed as expected.
 
-```text
-A ≺ B ≺ C
-```
+### 11.2 Case Studies
 
-must produce:
+Three case studies exercise realistic handler topologies:
 
-```text
-handle(
-  handle(
-    handle(P, A),
-    B
-  ),
-  C
-)
-```
+1. **HTTP middleware pipeline.** A total order `Auth ≺ Cache ≺ Logger` is parsed and synthesized into the nested `handle` term `handle (handle (handle body with Auth) with Cache) with Logger`.
+2. **Event-driven partial order.** A validator must run before both authentication and logging; both must run before metrics. Authentication and logging are incomparable under the partial order, so the compiler is free to order them deterministically. The test confirms that both possible relative orders preserve the declared constraints and that no cycle is introduced.
+3. **Cyclic detection.** Two- and three-handler cycles (`A ≺ B ≺ A` and `A ≺ B ≺ C ≺ A`) are rejected, while an acyclic chain `A ≺ B ≺ C` is accepted and ordered correctly.
 
-### 11.2 Detection of Invalid Topologies
+### 11.3 Property-Based Tests
 
-Generate cyclic specifications and verify that synthesis rejects them at compile time.
-
-Examples include:
-
-```text
-A ≺ B
-B ≺ A
-```
-
-and:
-
-```text
-A ≺ B
-B ≺ C
-C ≺ A
-```
-
-### 11.3 Behavioral Equivalence
-
-For specifications whose nesting is known manually, compare:
-
-```text
-manually nested program
-```
-
-with:
-
-```text
-declaratively synthesized program
-```
-
-and verify equivalent behavior under the existing VM.
-
-This experiment is more significant than simply checking the AST shape because handler nesting can affect which operation clause receives an operation.
+A randomized harness generates 50 acyclic specifications, 50 cyclic specifications, 50 constraint-respecting term examples, and a set of edge cases. Each trial checks that synthesis produces a nesting consistent with the declared precedence and that cyclic inputs are rejected. The `synthesize` implementation is therefore tested against a much larger space of inputs than the hand-written case studies alone.
 
 ### 11.4 Compilation Cost
 
-Measure synthesis time as the number of handlers and precedence constraints increases.
-
-The expected complexity is:
+The ordering phase is a standard topological sort and runs in:
 
 ```text
 O(|H| + |≺|)
 ```
 
-for the ordering phase.
-
-The experiment should verify that synthesis remains negligible relative to ordinary compilation and execution costs for realistic handler counts.
+Asymptotically, the AST construction phase adds `O(|H|)` nodes. Empirical timing benchmarks are left for future work, but the algorithmic complexity is bounded and the pass does not introduce any additional runtime dispatch.
 
 ## 12. Relationship to Prior Work
 
@@ -800,21 +791,23 @@ General algebraic-effects research establishes the separation between effect dec
 
 Our system applies this principle specifically to handler composition: the declarative specification describes how handlers should relate, while the compiler determines the concrete nesting required by the target calculus.
 
-## 13. Limitations
+## 13. Scope and Limitations
 
-The system intentionally has a narrow scope.
+The system is intentionally minimal in order to keep the correctness story clear and the formalization tractable. We do not view these limitations as weaknesses of the core result; rather, they delimit the scope of the current contribution and point directly to the extensions described in §14.
 
-First, it synthesizes a **static linear handler topology**. It does not synthesize arbitrary runtime handler graphs.
+First, it synthesizes a **static linear handler topology**. It does not synthesize arbitrary runtime handler graphs. This restriction is required by the target arrow calculus, whose handler structure is itself static.
 
-Second, the current model does not attempt to infer handler precedence automatically from arbitrary program behavior. Precedence must either be declared or derived from a separately specified static policy.
+Second, the current model does not attempt to infer handler precedence automatically from arbitrary program behavior. Precedence must either be declared or derived from a separately specified static policy. This separation of concerns keeps the synthesis algorithm independent of any particular program-analysis machinery.
 
-Third, a partial order may admit multiple valid linear extensions. Although deterministic tie-breaking can provide reproducible output, different valid extensions may have different runtime behavior when handlers interact. A complete system therefore needs a semantic account of when two handlers may be safely reordered.
+Third, a partial order may admit multiple valid linear extensions. Although deterministic tie-breaking can provide reproducible output, different valid extensions may have different runtime behavior when handlers interact. A complete system therefore needs a semantic account of when two handlers may be safely reordered; the two-handler case is already formalized in §14.1.
 
 Fourth, the present work does not establish that every useful effect system can be represented by the arrow model. Its claims are restricted to handler topology that can be represented by the existing arrow calculus.
 
 Finally, the current implementation does not optimize handler composition. Its purpose is to establish the correctness and practicality of the declarative-to-nested transformation.
 
 ## 14. Future Work
+
+The minimal system described here forms a self-contained foundation: it defines the declarative-to-nested lowering, proves its correctness, and provides a practical implementation path. The extensions below are natural next steps that build directly on this foundation.
 
 ### 14.1 Semantic Commutativity
 

@@ -28,3 +28,7 @@
 - [ ] Compare compile time with and without synthesis pass (overhead should be negligible)
 - [ ] Test with realistic handler counts (10, 50, 100, 500 handlers)
 - [ ] Benchmark topological sort separately from AST construction
+
+## Publication
+
+- [ ] Add arXiv/DOI badge and link to README once published
