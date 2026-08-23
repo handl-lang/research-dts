@@ -8,7 +8,6 @@ import Dts.Semantics
 import Dts.SemanticEquivalence
 import Dts.Commutativity
 import Dts.Sanada
-import Dts.EffectBridge
 import Dts.SanadaExperiment
 import Dts.SanadaStrong
 import Dts.SanadaSpec
