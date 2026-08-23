@@ -1,3 +1,18 @@
+---
+title: "Declarative Handler Topology Synthesis for Arrow Effects"
+author: "Luis Emidio"
+date: "2025-08-23"
+geometry: margin=1in
+fontsize: 11pt
+documentclass: article
+number-sections: false
+listings: true
+format:
+  pdf:
+    engine: xelatex
+    linestretch: 1.15
+---
+
 # Declarative Handler Topology Synthesis for Arrow Effects
 
 ## Abstract
