@@ -1112,20 +1112,30 @@ the current \texttt{lake\ build}:
   diamond theorems.
 \end{itemize}
 
-\textbf{Formally complete within a fragment.} \texttt{SanadaBridge.lean}
-is now machine-checked and part of the current \texttt{lake\ build}: it
-shows that the abstract \texttt{ProfunctorCommute2} certificate in
-\texttt{SanadaTwoHandlers.lean} implies the concrete two-handler
-\texttt{Command.Equiv} trace-equality theorem in
-\texttt{Dts.Commutativity.lean}
-(\texttt{Commutativity\_from\_ProfunctorCommute2}).
+\textbf{Formally complete within a fragment.}
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{SanadaBridge.lean} is now machine-checked and part of the
+  current \texttt{lake\ build}: it shows that the abstract
+  \texttt{ProfunctorCommute2} certificate in
+  \texttt{SanadaTwoHandlers.lean} implies the concrete two-handler
+  \texttt{Command.Equiv} trace-equality theorem in
+  \texttt{Dts.Commutativity.lean}
+  (\texttt{Commutativity\_from\_ProfunctorCommute2}).
+\item
+  \texttt{EffectBridge.lean} is also machine-checked and wired into the
+  build: it constructs a minimal concrete free-promonad model with two
+  operations (\texttt{get} and \texttt{log}) and verifies
+  \texttt{profunctor\_commute\_cert}, i.e.~the two handler composites
+  are equal in the \texttt{Sanada} model.
+\end{itemize}
 
 \textbf{Proofs in progress / future work.} The full arrow-calculus
 bridge connecting the abstract strong-promonad model to every
-\texttt{Dts} command is intentionally not attempted. The
-\texttt{get}/\texttt{log} concrete example in \texttt{EffectBridge.lean}
-instantiates the abstract diamond with two independent operations, but
-it is not yet wired into the root \texttt{Dts.lean} build.
+\texttt{Dts} command is intentionally not attempted. All current
+\texttt{lake\ build} targets are \texttt{sorry}-free and pass.
 
 The \texttt{exists\_linear\_extension} result used by
 \texttt{synthesize\_completeness} is a constructive version of the

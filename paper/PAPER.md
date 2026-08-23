@@ -562,9 +562,12 @@ The repository is divided into three formalization categories so that the paper'
 - `profunctorCommute₂` in `SanadaTwoHandlers.lean` — abstract `P₂` commutation for two independent one-operation handlers;
 - `handler_commute_iff_profunctor_commute`, `handler_diamond_commute` in `Sanada.lean` and `SanadaStrong.lean` — abstract profunctor-level iff and diamond theorems.
 
-**Formally complete within a fragment.** `SanadaBridge.lean` is now machine-checked and part of the current `lake build`: it shows that the abstract `ProfunctorCommute2` certificate in `SanadaTwoHandlers.lean` implies the concrete two-handler `Command.Equiv` trace-equality theorem in `Dts.Commutativity.lean` (`Commutativity_from_ProfunctorCommute2`).
+**Formally complete within a fragment.**
 
-**Proofs in progress / future work.** The full arrow-calculus bridge connecting the abstract strong-promonad model to every `Dts` command is intentionally not attempted. The `get`/`log` concrete example in `EffectBridge.lean` instantiates the abstract diamond with two independent operations, but it is not yet wired into the root `Dts.lean` build.
+- `SanadaBridge.lean` is now machine-checked and part of the current `lake build`: it shows that the abstract `ProfunctorCommute2` certificate in `SanadaTwoHandlers.lean` implies the concrete two-handler `Command.Equiv` trace-equality theorem in `Dts.Commutativity.lean` (`Commutativity_from_ProfunctorCommute2`).
+- `EffectBridge.lean` is also machine-checked and wired into the build: it constructs a minimal concrete free-promonad model with two operations (`get` and `log`) and verifies `profunctor_commute_cert`, i.e. the two handler composites are equal in the `Sanada` model.
+
+**Proofs in progress / future work.** The full arrow-calculus bridge connecting the abstract strong-promonad model to every `Dts` command is intentionally not attempted. All current `lake build` targets are `sorry`-free and pass.
 
 The `exists_linear_extension` result used by `synthesize_completeness` is a constructive version of the standard order-theoretic linear-extension theorem (Szpilrajn's extension theorem) and is proved in `TopoSort.lean`.
 
