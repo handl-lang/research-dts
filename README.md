@@ -83,6 +83,7 @@ Build:
 ```sh
 cd python
 uv run python tests/test_precedence_parser.py
+uv run python tests/test_synthesis.py
 ```
 
 ### `project/`

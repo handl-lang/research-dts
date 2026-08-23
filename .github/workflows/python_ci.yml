@@ -28,3 +28,6 @@ jobs:
 
       - name: Run precedence parser tests
         run: uv run python tests/test_precedence_parser.py
+
+      - name: Run synthesis/case-study tests
+        run: uv run python tests/test_synthesis.py
