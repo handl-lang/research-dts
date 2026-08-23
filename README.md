@@ -77,7 +77,7 @@ Build:
 
 ```sh
 cd python
-uv run pytest
+uv run python tests/test_precedence_parser.py
 ```
 
 ### `project/`
