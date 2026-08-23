@@ -17,11 +17,11 @@ format:
 
 ## Abstract
 
-Algebraic effects and handlers provide a modular mechanism for separating the declaration of computational operations from their interpretation. In Sanada's calculus of algebraic effects and handlers for arrows, handler composition is represented explicitly by nested `handle` expressions. This representation exposes an important practical question: can handler topology be specified declaratively and synthesized statically, rather than written manually as nested syntax?
+Sanada's arrow calculus makes the nesting of `handle` constructs a structural part of the program: the programmer must explicitly encode the order in which handlers intercept operations. We ask whether this topology can instead be declared as a precedence relation and compiled into the correct nesting.
 
-We present a declarative handler-topology system layered above Sanada's arrow calculus. A declarative specification describes a finite set of handlers together with precedence constraints. A compile-time synthesis pass converts this specification into a linearly nested sequence of `handle` expressions accepted by the underlying arrow calculus. The synthesis problem is therefore formulated as finding a linear extension of a handler-precedence partial order, rather than constructing a branching runtime computation.
+Because the arrow calculus restricts handler composition to a linear, static sequence, the synthesis problem is not a search over arbitrary runtime topologies; it is the order-theoretic problem of finding a linear extension of a finite partial order over handlers. We present a compile-time pass that lowers such a relation into the nested `handle` expressions required by the calculus, and we formally establish that the pass preserves well-formedness, precedence, and staticity. For clause-disjoint handlers, we prove that swapping their order preserves the trace, and we machine-check the abstract `ProfunctorCommute2` certificate and the concrete bridge to the `Dts` trace theorem in a Sanada-style two-operation promonad fragment. The core structural and trace-level theorems are machine-checked in Lean 4.
 
-This distinction is important because the expressiveness limitation identified by Sanada concerns effectful command branching within the arrow semantics. Our synthesis mechanism introduces no such runtime branching: it generates a fixed handler topology before execution. We formalize the synthesis transformation, characterize its well-formedness and precedence-preservation properties, and describe an implementation strategy for arrow-effect languages that lowers declarative specifications directly to existing handler-expression AST nodes. The resulting system requires no new runtime mechanism and preserves the semantic boundary imposed by the underlying arrow calculus.
+The key result is that the declarative layer is added without changing the arrow calculus, its runtime, or admitting the dynamic effectful branching that the calculus excludes. The compiler emits ordinary nested `handle` terms that the existing runtime already executes.
 
 ## 1. Introduction
 
@@ -39,9 +39,9 @@ We investigate whether this topology can instead be specified declaratively.
 
 The problem considered in this paper is narrower than general topology synthesis. We do not attempt to infer arbitrary computational graphs, physical layouts, or dynamic effect-routing structures. Rather, we consider the specific problem of **synthesizing the static nesting topology of arrow effect handlers**.
 
-Our central observation is that the synthesis problem is naturally expressed as an ordering problem. Given a finite collection of handlers and constraints describing their relative precedence, the compiler can compute a linear extension of those constraints and generate the corresponding nested `handle` expression.
-
 This approach is compatible with the structural restriction of the arrow calculus. In the semantic setting considered by Sanada, the algebraic structure associated with arrows corresponds to a sequence of operations rather than the branching operation trees associated with ordinary monads. In particular, the problematic case is runtime branching between effectful commands. Our synthesis pass does not introduce such branching: its output is a statically determined sequence of nested handlers.
+
+Our central contribution is to identify handler topology as a declarative compilation target for arrow effects. Because the arrow calculus already fixes handler composition as a linear, static sequence, the compiler's task is not to invent a new runtime topology but to resolve a partial order into one of its linear extensions. We show that this resolution can be performed entirely at compile time, producing ordinary `handle` terms without extending the arrow calculus or its runtime and without admitting the dynamic effectful branching that the calculus rules out.
 
 The contributions of this paper are:
 
@@ -50,7 +50,7 @@ The contributions of this paper are:
 3. **Structural correctness properties.** We establish that synthesis produces valid arrow-calculus terms and preserves declared handler precedence.
 4. **A minimal implementation.** We describe a compile-time AST transformation for arrow-effect languages that reuses existing handler representations and virtual machines.
 5. **An explicit expressiveness boundary.** We distinguish static synthesis, which produces a fixed handler topology, from runtime dynamic selection of effectful computations, which lies outside the arrow semantics considered here.
-6. **A Lean 4 formalization.** The correctness properties are mechanically verified in Lean 4 with no admitted proofs (§7).
+6. **A Lean 4 formalization.** The core structural and trace-level properties are mechanically verified in Lean 4. The Sanada promonad bridge is formalized for the two-handler fragment; §7.3 records the status of each claim.
 
 ## 2. Background
 
@@ -155,13 +155,9 @@ The relation is not itself a nesting tree. It describes constraints on the event
 
 ### 3.2 Partial Orders
 
-The precedence relation is assumed to form a partial order.
+The precedence relation is assumed to form a strict partial order.
 
-Thus it must be:
-
-- irreflexive;
-- transitive;
-- asymmetric.
+Thus it is taken as finite, irreflexive, and transitive. Asymmetry is not an independent requirement: if `Hᵢ ≺ Hⱼ` and `Hⱼ ≺ Hᵢ` held together, transitivity would imply `Hᵢ ≺ Hᵢ`, contradicting irreflexivity. The Lean formalization proves this derivation explicitly as `irreflexive_transitive_implies_asymmetric`.
 
 If two handlers are unrelated by the declared relation, the compiler is free to choose either relative order, subject to any additional semantic requirements imposed by the implementation.
 
@@ -232,45 +228,51 @@ S(D, P) =
 
 Thus the first handler in the linear extension is the innermost handler.
 
-### 4.2 Example
+### 4.2 Example: a pipeline with multiple independent constraints
 
-Consider:
-
-```text
-events:
-
-  - handler: FetchHandler
-    handles: [fetch]
-    priority: 10
-
-  - handler: CacheHandler
-    handles: [cache]
-    priority: 20
-
-  - handler: LogHandler
-    handles: [log]
-    priority: 30
-
-body: ...
-```
-
-The priority declarations induce:
+Consider a declarative specification for an HTTP request pipeline:
 
 ```text
-FetchHandler ≺ CacheHandler ≺ LogHandler
+Validate before Auth
+Auth before Cache
+Cache before Metrics
+Auth before Audit
 ```
 
-The synthesizer produces:
+These constraints form the DAG:
+
+```text
+Validate → Auth → Cache → Metrics
+              ↘
+                Audit
+```
+
+`Audit` and `Metrics` are not comparable, and a `Retry` handler has no constraints with the others. The compiler must first validate that the relation is acyclic and then compute a linear extension. Two valid linear extensions are:
+
+```text
+[Validate, Auth, Cache, Audit, Metrics, Retry]
+[Validate, Auth, Cache, Metrics, Audit, Retry]
+```
+
+Synthesizing the first yields:
 
 ```text
 handle (
   handle (
-    handle body with FetchHandler
-  ) with CacheHandler
-) with LogHandler
+    handle (
+      handle (
+        handle (
+          handle body with Validate
+        ) with Auth
+      ) with Cache
+    ) with Audit
+  ) with Metrics
+) with Retry
 ```
 
-The declarative representation therefore describes the ordering constraint without requiring the programmer to manually encode the nesting.
+The second swaps `Audit` and `Metrics`. Both are topologically correct, but they are not necessarily observationally equivalent. If `Audit` and `Metrics` both handle the same operation, the one placed innermost catches it first, so the choice between the two extensions matters. Only when the handlers are clause-disjoint can they be safely reordered without changing behavior; that semantic admissibility condition is the subject of §14.1.
+
+This example makes the partial-order formulation essential rather than decorative: the programmer declares the constraints that must hold and leaves the compiler to choose among the valid linearizations, subject to the semantic admissibility of the chosen order.
 
 ### 4.3 Priority as a Convenience Syntax
 
@@ -298,6 +300,16 @@ H₁ ≺ H₃
 which leaves `H₂` and `H₃` unordered.
 
 This distinction allows the compiler to reject genuinely contradictory constraints while avoiding unnecessary ordering requirements. It also means that two handlers with the same priority are not forced into a particular relative order; the compiler may use declaration order as a deterministic tie-break.
+
+### 4.4 Synthesis as Two Problems
+
+It is useful to separate synthesis into two distinct problems.
+
+**Structural synthesis.** Given an acyclic partial order over handlers, find a linear extension and fold `handle` over it. This is the problem solved in §4.1 and §5. The guarantee is purely topological: every declared precedence constraint is realized in the generated nesting.
+
+**Semantic admissibility.** When several linear extensions are valid, the compiler must choose one. Not every valid choice is observationally equivalent. The question is when a chosen order is guaranteed to produce the same trace as another. The two-handler case is treated in §14.1: when two handlers are clause-disjoint, the `synthesize_commutative_two` theorem states that the two orders produce identical traces, and the `SanadaBridge` module supplies a categorical `ProfunctorCommute2` certificate for that commutativity.
+
+The structural problem is solved in this paper. The semantic admissibility problem is introduced and solved for the two-handler case; the general case remains future work.
 
 ## 5. Synthesis Algorithm
 
@@ -383,9 +395,16 @@ remains mandatory, while unrelated handlers receive a deterministic but otherwis
 
 The question of when two handlers can be safely reordered without changing behavior is a semantic question (see §14.1).
 
-## 6. Correctness
+## 6. Correctness Properties
 
-The central correctness properties concern the relationship between the declarative specification and the generated syntax.
+The results in this section concern the relationship between the declarative specification and the generated term. They are intentionally separated by level:
+
+1. **Syntactic correctness** — the generated `handle` term is well-formed.
+2. **Topological correctness** — the nesting realizes every declared precedence constraint.
+3. **Staticity** — the synthesis pass introduces no runtime `cond` branching.
+4. **Trace-semantic equivalence** — the synthesized term has the same observable trace as a manually nested term, obtained here as a corollary of syntactic identity.
+
+A richer operational or denotational semantics, including continuation capture and resumption, is left for future work.
 
 ### 6.1 Well-Formedness
 
@@ -473,7 +492,9 @@ This distinction is central to the scope of the system.
 
 ## 7. Formalization in Lean 4
 
-The correctness properties of §6 have been mechanically verified in Lean 4. The formalization is split across the following files under `Dts/`:
+The properties described in §6 — syntactic, topological, staticity, and trace-semantic — have been mechanically verified in Lean 4. The formalization is split across the following files under `Dts/`.
+
+Core synthesis and semantics:
 
 - `Basic.lean` — core types (`Command`, `Handler`, `isStatic`, `isWellFormed`)
 - `Precedence.lean` — precedence model, partial orders, acyclicity
@@ -483,7 +504,19 @@ The correctness properties of §6 have been mechanically verified in Lean 4. The
 - `SemanticEquivalence.lean` — semantic equivalence of synthesized and manually nested terms
 - `Commutativity.lean` — semantic commutativity of disjoint handlers, with counterexample
 
-The root `Dts.lean` imports all modules. The project compiles with no `sorry` (no admitted proofs). Mathlib is used for tactic utilities only (e.g., `omega`, `push_neg`); no mathematical content is imported from it.
+Sanada arrow-calculus bridge:
+
+- `Sanada.lean` — abstract profunctor, promonad, and P-algebra model
+- `SanadaStrong.lean` — multi-object strong profunctors and diamond commutativity
+- `SanadaParameterized.lean` — concrete one-operation parameterized strong promonad
+- `SanadaTwoHandlers.lean` — two-operation term model and `ProfunctorCommute2`
+- `SanadaBridge.lean` — derives concrete `Dts.Commutativity` from the promonad certificate
+- `SanadaSpec.lean` — specification and gaps for the full Sanada semantics (kept as documentation, not a required model)
+- `EffectBridge.lean` — concrete `get`/`log` example instantiating the abstract diamond
+
+Topological sort is also implemented in the self-hosted `ListDigraph/` library (`ListDigraph.Basic.lean` and `ListDigraph.TopSort.lean`).
+
+The root `Dts.lean` imports the core modules. The project is intended to compile with no `sorry` and no admitted proofs; the status of each component is given in §7.3. Mathlib is used for tactic utilities only (e.g., `omega`, `push_neg`); no mathematical content is imported from it.
 
 ### 7.1 Model
 
@@ -506,67 +539,49 @@ The Lean model mirrors the paper's definitions:
 - `reachable_implies_edge` — Lemma: reachability implies a direct edge (used by acyclicity)
 - `exists_linear_extension` — Topological sort soundness (existence of linear extension)
 - `synthesize_eq_manuallyNested` — Syntactic equality of synthesis and explicit nesting
-- `synthesize_equiv_manuallyNested` — Semantic equivalence (Corollary: equal syntax ⇒ equal traces)
+- `synthesize_equiv_manuallyNested` — Trace equivalence as a corollary of syntactic identity (not an independent semantic theorem)
 - `synthesize_commutative_two` — Semantic commutativity for disjoint handlers (§14.1)
+- `handler_commute_iff_profunctor_commute` — Abstract iff: two endo-handlers commute iff their right-P actions commute (`Sanada.lean`)
+- `handler_diamond_commute` — Diamond commutativity from `ProfunctorCommute2` (`SanadaStrong.lean`)
+- `eval_preserves` — Nontrivial one-operation handler preserves the `P`-algebra action (`SanadaParameterized.lean`)
+- `profunctorCommute₂` — Concrete `P₂` commutation for two independent one-operation handlers (`SanadaTwoHandlers.lean`)
+- `Commutativity_from_ProfunctorCommute2` — Machine-checked bridge from the promonad certificate to concrete `Command.Equiv` (`SanadaBridge.lean`)
 
-### 7.3 Assumptions
+### 7.3 Formalization status
 
-The formalization makes no unproven assumptions. The linear extension property used by `synthesize_completeness` is established by `exists_linear_extension` in `TopoSort.lean`, which proves that for any finite list of handlers with an irreflexive and transitive precedence relation, a valid linear extension exists. This is a constructive version of a standard result in order theory (Szpilrajn's extension theorem).
+The repository is divided into three formalization categories so that the paper's claims can be verified against the code at any point.
+
+**Formally complete.** The following results are machine-checked in the current `lake build`:
+
+- `irreflexive_transitive_implies_asymmetric`, `partialOrder_acyclic`, `exists_linear_extension` — partial-order/topological properties;
+- `synthesize_well_formed`, `synthesize_preserves_precedence`, `synthesize_static_topology`, `synthesize_completeness` — core synthesis correctness;
+- `synthesize_eq_manuallyNested`, `synthesize_equiv_manuallyNested` — syntactic and trace equivalence of synthesis to explicit nesting;
+- `synthesize_commutative_two`, `firstHandler_swap`, `evalWith_swap` — two-handler trace commutativity;
+- `profunctorCommute₂` in `SanadaTwoHandlers.lean` — abstract `P₂` commutation for two independent one-operation handlers;
+- `handler_commute_iff_profunctor_commute`, `handler_diamond_commute` in `Sanada.lean` and `SanadaStrong.lean` — abstract profunctor-level iff and diamond theorems.
+
+**Formally complete within a fragment.** `SanadaBridge.lean` is now machine-checked and part of the current `lake build`: it shows that the abstract `ProfunctorCommute2` certificate in `SanadaTwoHandlers.lean` implies the concrete two-handler `Command.Equiv` trace-equality theorem in `Dts.Commutativity.lean` (`Commutativity_from_ProfunctorCommute2`).
+
+**Proofs in progress / future work.** The full arrow-calculus bridge connecting the abstract strong-promonad model to every `Dts` command is intentionally not attempted. The `get`/`log` concrete example in `EffectBridge.lean` instantiates the abstract diamond with two independent operations, but it is not yet wired into the root `Dts.lean` build.
+
+The `exists_linear_extension` result used by `synthesize_completeness` is a constructive version of the standard order-theoretic linear-extension theorem (Szpilrajn's extension theorem) and is proved in `TopoSort.lean`.
 
 ## 8. Relationship to Arrow Expressiveness
 
-### 8.1 Dynamic Command Branching
-
-Consider a hypothetical program:
+Sanada's arrow calculus restricts effectful commands to a linear, static sequence. The problematic case for our purposes is runtime branching between effectful commands, such as:
 
 ```text
 v ⇐ op()
 if v then P₁ else P₂
 ```
 
-where `P₁` and `P₂` are effectful commands.
-
-The branch selects a future effectful computation based on the result of an operation. This is fundamentally different from static handler synthesis.
-
-Our system instead performs:
+where `P₁` and `P₂` are effectful. Our synthesis pass does not introduce such branching. The handler topology is fixed at compile time:
 
 ```text
-compile time:
-    determine H₁ ≺ H₂ ≺ H₃
-
-execution time:
-    execute fixed nesting
+H₁ → H₂ → H₃ → P
 ```
 
-The handler topology is therefore independent of runtime operation results.
-
-### 8.2 Pure Term-Level Branching
-
-The restriction does not imply that all conditional behavior disappears.
-
-A pure value can still participate in ordinary term-level computation. The relevant distinction is whether the branch dynamically selects between effectful command structures.
-
-Our compiler does not need to alter this distinction.
-
-### 8.3 Why the Restriction Is Useful
-
-The same restriction that limits dynamic expressiveness also simplifies static synthesis.
-
-If arbitrary runtime command branching were permitted, the handler topology might itself depend on runtime execution paths. A compiler would then potentially need to synthesize a branching handler structure.
-
-Under the arrow model considered here, static handler topology remains a linear structure:
-
-```text
-H₁
- ↓
-H₂
- ↓
-H₃
- ↓
-P
-```
-
-This makes compile-time synthesis particularly simple.
+Pure term-level branching remains possible, but the handler order itself is independent of operation results. This restriction is what makes compile-time synthesis well defined: if the topology could depend on runtime paths, a static linear nesting would no longer suffice.
 
 ## 9. Declarative Language Design
 
@@ -741,7 +756,7 @@ Three case studies exercise realistic handler topologies:
 
 A randomized harness generates 50 acyclic specifications, 50 cyclic specifications, 50 constraint-respecting term examples, and a set of edge cases. Each trial checks that synthesis produces a nesting consistent with the declared precedence and that cyclic inputs are rejected. The `synthesize` implementation is therefore tested against a much larger space of inputs than the hand-written case studies alone.
 
-### 11.4 Compilation Cost
+### 11.4 Compilation and Runtime Cost
 
 The ordering phase is a standard topological sort and runs in:
 
@@ -749,7 +764,18 @@ The ordering phase is a standard topological sort and runs in:
 O(|H| + |≺|)
 ```
 
-Asymptotically, the AST construction phase adds `O(|H|)` nodes. Empirical timing benchmarks are left for future work, but the algorithmic complexity is bounded and the pass does not introduce any additional runtime dispatch.
+AST construction adds `O(|H|)` nodes. Because the emitted code is a sequence of the same `handle` nodes the runtime already uses, there is no additional dispatch cost after lowering: the VM evaluates `handle (handle ... body with H₁) with H₂` exactly as it would a manually nested program. The only new work is at compile time.
+
+Empirical measurements were produced by `python/benchmark.py` on a modern Linux laptop. The benchmark uses a linear Kahn topological sort (without the deterministic tie-breaking sort used by the reference Python case studies) to isolate the core `O(|H| + |≺|)` scaling of the synthesis pass. Each handler handles one unique operation, and the precedence relation is a simple chain `H₀ ≺ H₁ ≺ … ≺ Hₙ₋₁`.
+
+| `n` handlers | `m` constraints | toposort (ms) | synthesis (ms) | AST `handle` nodes | cycle detection (ms) |
+|-------------:|----------------:|--------------:|---------------:|-------------------:|---------------------:|
+| 10           | 9               | 0.015         | 0.004          | 10                 | 0.007                |
+| 100          | 99              | 0.056         | 0.012          | 100                | 0.028                |
+| 1,000        | 999             | 0.549         | 0.056          | 1,000              | 0.255                |
+| 10,000       | 9,999           | 6.593         | 0.716          | 10,000             | 3.713                |
+
+The toposort and cycle-detection times grow linearly with the input size, as expected. AST construction is `O(|H|)` and remains below one millisecond even for 10,000 handlers. Because the emitted term is a plain nested `handle` expression, the VM evaluates it with the same dispatch cost as a manually nested program.
 
 ## 12. Relationship to Prior Work
 
@@ -791,19 +817,19 @@ General algebraic-effects research establishes the separation between effect dec
 
 Our system applies this principle specifically to handler composition: the declarative specification describes how handlers should relate, while the compiler determines the concrete nesting required by the target calculus.
 
+### 12.4 Handler Order and Commutativity
+
+The question of when two handlers can be safely reordered has been studied directly. Yang and Wu (2021), in *Reasoning about effect interaction by fusion*, derive sufficient conditions under which handler composition is insensitive to order, using fold/build fusion and continuation-passing style. Their work focuses on semantic conditions for commutativity; it does not propose a declarative, compile-time precedence language that emits the nesting automatically.
+
+Our contribution is therefore not the observation that handlers can commute, but the combination of (1) a declarative partial-order specification, (2) a compile-time linear-extension synthesis pass, and (3) a machine-checked account of the resulting static topology. The `get`/`log` and two-handler `Dts` examples instantiate existing commutativity ideas in the concrete Sanada setting; the novelty lies in the declarative-to-nested compilation pipeline and its formal correctness.
+
 ## 13. Scope and Limitations
 
-The system is intentionally minimal in order to keep the correctness story clear and the formalization tractable. We do not view these limitations as weaknesses of the core result; rather, they delimit the scope of the current contribution and point directly to the extensions described in §14.
+The system is intentionally minimal. We do not view these as weaknesses; they delimit the current contribution and point to §14.
 
-First, it synthesizes a **static linear handler topology**. It does not synthesize arbitrary runtime handler graphs. This restriction is required by the target arrow calculus, whose handler structure is itself static.
+Precedence must be declared or derived from a separate static policy; we do not infer it from arbitrary program behavior. A partial order may admit multiple valid linear extensions, and a complete semantic account of when two such extensions are observationally equivalent is only solved here for the two-handler, clause-disjoint case (§14.1). The implementation does not optimize the generated `handle` composition; the output is ordinary nested `handle` terms for the existing runtime.
 
-Second, the current model does not attempt to infer handler precedence automatically from arbitrary program behavior. Precedence must either be declared or derived from a separately specified static policy. This separation of concerns keeps the synthesis algorithm independent of any particular program-analysis machinery.
-
-Third, a partial order may admit multiple valid linear extensions. Although deterministic tie-breaking can provide reproducible output, different valid extensions may have different runtime behavior when handlers interact. A complete system therefore needs a semantic account of when two handlers may be safely reordered; the two-handler case is already formalized in §14.1.
-
-Fourth, the present work does not establish that every useful effect system can be represented by the arrow model. Its claims are restricted to handler topology that can be represented by the existing arrow calculus.
-
-Finally, the current implementation does not optimize handler composition. Its purpose is to establish the correctness and practicality of the declarative-to-nested transformation.
+The Sanada bridge in §7 is a categorical certificate for the two-handler commutativity theorem, not a full arrow-calculus interpretation of every `Dts` command.
 
 ## 14. Future Work
 
@@ -831,6 +857,8 @@ The proof proceeds by showing that swapping two disjoint adjacent handlers in th
 
 A counterexample demonstrates that the disjointness condition is necessary: when two handlers both handle the same operation, the innermost handler catches it, so reordering changes the trace.
 
+The same two-handler equivalence has a categorical certificate in the Sanada formalization. `SanadaBridge.lean` shows that `ProfunctorCommute2` for the two-operation promonad model implies the concrete `Command.Equiv` equality above (`Commutativity_from_ProfunctorCommute2`). In other words, the syntactic trace-equality theorem is grounded in the profunctor-level commutation of the handlers' right actions.
+
 The general case — arbitrary permutations of pairwise-disjoint handler lists — is left as future work. The two-handler case is fully proved.
 
 ### 14.2 Inferred Precedence
@@ -849,6 +877,7 @@ The Lean formalization (§7) establishes both structural and semantic correctnes
 
 1. The general commutativity conjecture: for a static body, if all handlers in a list are pairwise clause-disjoint, then any permutation of that list produces the same trace.
 2. Semantic equivalence under a richer operational semantics that models continuation capture and resumption, beyond the trace semantics currently formalized.
+3. A full Sanada arrow-calculus interpretation connecting the abstract strong-promonad model to every `Dts` command, beyond the two-handler fragment already bridged in `SanadaBridge.lean`.
 
 ### 14.5 Beyond Total Handler Order
 
@@ -860,7 +889,7 @@ We presented a declarative system for synthesizing handler topology in an arrow 
 
 The key idea is to separate **handler specification** from **handler syntax**. A programmer declares a set of handlers and a precedence relation. The compiler computes a linear extension of that relation and lowers it to the nested `handle` expressions required by the underlying calculus.
 
-This transformation is fundamentally static. It does not introduce runtime branching over effectful commands and therefore does not require an extension of the arrow semantic model. The synthesis problem is consequently reduced to a well-defined compile-time ordering problem. Its correctness has been mechanically verified in Lean 4 (§7), covering well-formedness, precedence preservation, staticity, completeness, semantic equivalence, and two-handler commutativity for disjoint handlers.
+This transformation is fundamentally static. It does not introduce runtime branching over effectful commands and therefore does not require an extension of the arrow semantic model. The synthesis problem is consequently reduced to a well-defined compile-time ordering problem. Its structural and trace-level properties have been mechanically verified in Lean 4 (§7), covering well-formedness, precedence preservation, staticity, completeness, trace equivalence, and two-handler commutativity for disjoint handlers.
 
 The approach also provides a minimal implementation path. In a language with existing handler-expression AST nodes, the declarative system can be implemented as an AST-to-AST transformation producing those nodes. The existing runtime remains responsible for ordinary handler evaluation.
 

@@ -4,7 +4,7 @@
 [![Python CI](https://github.com/luisfuturist/dts/actions/workflows/python_ci.yml/badge.svg)](https://github.com/luisfuturist/dts/actions/workflows/python_ci.yml)
 [![Paper CI](https://github.com/luisfuturist/dts/actions/workflows/paper_ci.yml/badge.svg)](https://github.com/luisfuturist/dts/actions/workflows/paper_ci.yml)
 
-Research project on **declarative handler topology synthesis** for functional programming languages with algebraic effects and handlers. The central goal is to let programmers specify *which handler wraps which* as a precedence relation, and have the compiler synthesize the correct nested `handle` structure statically.
+Research project on **declarative handler topology synthesis** for functional programming languages with algebraic effects and handlers, with a Sanada-style strong-promonad formalization of arrow-handler commutativity. The central goal is to let programmers specify *which handler wraps which* as a precedence relation, and have the compiler synthesize the correct nested `handle` structure statically.
 
 This is a practical language-design problem: in effect systems with explicit handler nesting, the programmer often knows the desired precedence (e.g., "Auth must be inside Cache") but must still write the nesting by hand. DTS proposes a compile-time synthesis pass that converts a declarative specification into a linearly nested handler expression.
 
@@ -59,9 +59,11 @@ mv PAPER.pdf paper.pdf
 
 ### `lean/`
 
-A Lean 4 formalization of the paper's correctness claims. The proofs are machine-checked (the project builds with `lake build` and contains no admitted proofs).
+A Lean 4 formalization of the paper's correctness claims. The core structural and trace-level proofs are machine-checked. The Sanada promonad bridge is formalized for the two-handler fragment; the current build status is recorded in `paper/PAPER.md` §7.3.
 
 The topological sort is implemented in a self-hosted `ListDigraph` package that provides a finite, executable, `List`-returning `topSort` correctness proof, decoupled from `Mathlib.Combinatorics.Digraph`.
+
+The formalization also includes a Sanada-style strong-promonad model. It builds from an abstract profunctor/promonad layer up to a concrete two-operation parameterized model, and ends with `SanadaBridge.lean`, which derives the concrete two-handler `Dts.Commutativity` theorem from a categorical `ProfunctorCommute2` certificate.
 
 Relevant theorems include:
 
@@ -71,7 +73,8 @@ Relevant theorems include:
 - `synthesize_completeness` — every precedence constraint is realized;
 - `exists_linear_extension` — a topological sort is always available for finite acyclic relations;
 - `synthesize_equiv_manuallyNested` — synthesized and manually nested programs have identical traces;
-- `synthesize_commutative_two` — disjoint handlers can be reordered without changing behavior.
+- `synthesize_commutative_two` — disjoint handlers can be reordered without changing behavior;
+- `Commutativity_from_ProfunctorCommute2` — the concrete two-handler bridge from the Sanada promonad certificate is formalized (build status in `paper/PAPER.md` §7.3).
 
 Build:
 
@@ -95,6 +98,7 @@ Build:
 cd python
 uv run python tests/test_precedence_parser.py
 uv run python tests/test_synthesis.py
+uv run python benchmark.py
 ```
 
 ### `project/`
@@ -118,6 +122,7 @@ This project is released under the [MIT License](LICENSE). If you use this softw
 - `paper/PAPER.md` — full paper source.
 - `paper/paper.pdf` — compiled PDF.
 - `lean/Dts/` — formalized definitions and proofs.
+- `lean/Dts/SanadaBridge.lean` — categorical bridge from profunctor commutativity to concrete handler equivalence.
 - `lean/ListDigraph/` — self-hosted list-based topological sort package.
 - `python/tests/` — executable tests and case studies.
 - `project/TODO.md` — implementation and evaluation task list.

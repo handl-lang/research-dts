@@ -4,8 +4,7 @@ namespace Dts.SanadaSpec
 
 This document records the mathematical interface that the concrete, parameterized
 arrow-handler semantics must implement.  It is based on the existing Lean files
-`lean/Dts/Sanada.lean`, `lean/Dts/SanadaExperiment.lean`,
-`lean/Dts/Commutativity.lean`, `paper/PAPER.md`, and on the fragments of
+`lean/Dts/Sanada.lean`, `lean/Dts/Commutativity.lean`, `paper/PAPER.md`, and on the fragments of
 Sanada's work that were available through web search (JFP 2024 and the PhD
 thesis).  Direct PDF retrieval was not possible from this environment, so the
 exact equations that were not present in the search snippets are marked as
