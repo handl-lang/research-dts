@@ -1,5 +1,8 @@
 # Declarative Topology Synthesis (DTS)
 
+[![Lean CI](https://github.com/luisfuturist/dts/actions/workflows/lean_action_ci.yml/badge.svg)](https://github.com/luisfuturist/dts/actions/workflows/lean_action_ci.yml)
+[![Python CI](https://github.com/luisfuturist/dts/actions/workflows/python_ci.yml/badge.svg)](https://github.com/luisfuturist/dts/actions/workflows/python_ci.yml)
+
 Research project on **declarative handler topology synthesis** for functional programming languages with algebraic effects and handlers. The central goal is to let programmers specify *which handler wraps which* as a precedence relation, and have the compiler synthesize the correct nested `handle` structure statically.
 
 This is a practical language-design problem: in effect systems with explicit handler nesting, the programmer often knows the desired precedence (e.g., "Auth must be inside Cache") but must still write the nesting by hand. DTS proposes a compile-time synthesis pass that converts a declarative specification into a linearly nested handler expression.
@@ -47,6 +50,8 @@ The research paper, "Declarative Handler Topology Synthesis for Arrow Effects." 
 
 A Lean 4 formalization of the paper's correctness claims. The proofs are machine-checked (the project builds with `lake build` and contains no admitted proofs).
 
+The topological sort is implemented in a self-hosted `ListDigraph` package that provides a finite, executable, `List`-returning `topSort` correctness proof, decoupled from `Mathlib.Combinatorics.Digraph`.
+
 Relevant theorems include:
 
 - `synthesize_well_formed` — synthesis preserves well-formedness;
@@ -69,9 +74,9 @@ lake build
 Python tooling and case studies for the research. Includes:
 
 - a precedence parser and cycle-detection harness;
-- a working AST-to-AST synthesis pass;
+- a reference AST-to-AST synthesis pass;
 - case studies such as HTTP middleware pipelines and event-driven handler chains;
-- property-based and integration tests.
+- executable parser tests.
 
 Build:
 
@@ -92,9 +97,14 @@ Any functional language with an AST that includes explicit handler nesting and a
 2. **It is provably correct** — the paper argues the properties, and the Lean formalization verifies them mechanically.
 3. **It does not change the runtime** — the runtime still sees ordinary nested `handle` expressions; only the frontend grows a declarative layer.
 
+## License and Citation
+
+This project is released under the [MIT License](LICENSE). If you use this software or the accompanying Lean formalization, please cite it using the information in [CITATION.cff](CITATION.cff).
+
 ## Further reading
 
 - `PAPER.md` — full paper.
 - `lean/Dts/` — formalized definitions and proofs.
+- `lean/ListDigraph/` — self-hosted list-based topological sort package.
 - `python/tests/` — executable tests and case studies.
 - `project/TODO.md` — implementation and evaluation task list.
