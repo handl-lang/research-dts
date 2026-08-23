@@ -2,6 +2,7 @@
 
 [![Lean CI](https://github.com/luisfuturist/dts/actions/workflows/lean_action_ci.yml/badge.svg)](https://github.com/luisfuturist/dts/actions/workflows/lean_action_ci.yml)
 [![Python CI](https://github.com/luisfuturist/dts/actions/workflows/python_ci.yml/badge.svg)](https://github.com/luisfuturist/dts/actions/workflows/python_ci.yml)
+[![Paper CI](https://github.com/luisfuturist/dts/actions/workflows/paper_ci.yml/badge.svg)](https://github.com/luisfuturist/dts/actions/workflows/paper_ci.yml)
 
 Research project on **declarative handler topology synthesis** for functional programming languages with algebraic effects and handlers. The central goal is to let programmers specify *which handler wraps which* as a precedence relation, and have the compiler synthesize the correct nested `handle` structure statically.
 
@@ -37,7 +38,7 @@ Because arrow effects impose a linear, sequential structure on operations, a sta
 
 This repository contains three complementary artifacts:
 
-### `PAPER.md`
+### `paper/`
 
 The research paper, "Declarative Handler Topology Synthesis for Arrow Effects." It presents:
 
@@ -45,6 +46,16 @@ The research paper, "Declarative Handler Topology Synthesis for Arrow Effects." 
 - the synthesis algorithm as topological sort + AST fold;
 - correctness properties (well-formedness, precedence preservation, staticity, semantic equivalence, commutativity for disjoint handlers);
 - an implementation strategy for arrow-effect languages that reuses existing handler AST nodes and runtimes.
+
+The PDF is available as [`paper/paper.pdf`](paper/paper.pdf) and the Markdown source is [`paper/PAPER.md`](paper/PAPER.md).
+
+Build:
+
+```sh
+cd paper
+quarto render PAPER.md --to pdf
+mv PAPER.pdf paper.pdf
+```
 
 ### `lean/`
 
@@ -104,7 +115,8 @@ This project is released under the [MIT License](LICENSE). If you use this softw
 
 ## Further reading
 
-- `PAPER.md` — full paper.
+- `paper/PAPER.md` — full paper source.
+- `paper/paper.pdf` — compiled PDF.
 - `lean/Dts/` — formalized definitions and proofs.
 - `lean/ListDigraph/` — self-hosted list-based topological sort package.
 - `python/tests/` — executable tests and case studies.

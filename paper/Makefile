@@ -1,4 +1,4 @@
-PAPER = ../PAPER.md
+PAPER = PAPER.md
 DEFAULTS = pandoc.yaml
 
 .PHONY: all pdf tex clean
@@ -9,7 +9,7 @@ pdf: paper.pdf
 tex: main.tex
 
 paper.pdf: $(PAPER) $(DEFAULTS)
-	pandoc --defaults $(DEFAULTS) --pdf-engine=xelatex --output $@ $<
+	pandoc --defaults $(DEFAULTS) --output $@ $<
 
 main.tex: $(PAPER) $(DEFAULTS)
 	pandoc --defaults $(DEFAULTS) --output $@ $<

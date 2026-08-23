@@ -10,6 +10,7 @@ format:
   pdf:
     engine: xelatex
     linestretch: 1.15
+    latex-max-runs: 15
 ---
 
 # Declarative Handler Topology Synthesis for Arrow Effects
