@@ -6,7 +6,6 @@ geometry: margin=1in
 fontsize: 11pt
 documentclass: article
 number-sections: false
-listings: true
 format:
   pdf:
     engine: xelatex

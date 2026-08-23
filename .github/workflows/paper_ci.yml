@@ -1,0 +1,39 @@
+name: Paper CI
+
+on:
+  push:
+    paths:
+      - 'PAPER.md'
+      - 'paper/**'
+      - '.github/workflows/paper_ci.yml'
+  pull_request:
+    paths:
+      - 'PAPER.md'
+      - 'paper/**'
+      - '.github/workflows/paper_ci.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: 1.6.40
+
+      - name: Install TinyTeX
+        run: quarto install tinytex
+
+      - name: Render paper to PDF
+        run: |
+          quarto render PAPER.md --to pdf
+          mv PAPER.pdf paper/paper.pdf
+
+      - name: Upload PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-pdf
+          path: paper/paper.pdf
