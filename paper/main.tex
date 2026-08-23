@@ -77,19 +77,6 @@
 \newcommand{\VariableTok}[1]{\textcolor[rgb]{0.10,0.09,0.49}{#1}}
 \newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
 \newcommand{\WarningTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
-\usepackage{longtable,booktabs,array}
-\usepackage{caption}
-\captionsetup[table]{skip=6pt}
-\newcounter{none} % for unnumbered tables
-\usepackage{calc} % for calculating minipage widths
-% Correct order of tables after \paragraph or \subparagraph
-\usepackage{etoolbox}
-\makeatletter
-\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
-\makeatother
-% Allow footnotes in longtable head/foot
-\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
-\makesavenoteenv{longtable}
 \setlength{\emergencystretch}{3em} % prevent overfull lines
 \providecommand{\tightlist}{%
   \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
@@ -902,42 +889,40 @@ The Lean model mirrors the paper's definitions:
 
 \subsubsection{7.2 Proven Theorems}\label{proven-theorems}
 
-{\def\LTcaptype{none} % do not increment counter
-\begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
-\toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-Lean theorem
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-Paper proposition
-\end{minipage} \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-\texttt{irreflexive\_transitive\_implies\_asymmetric} & Lemma: asymmetry
-is derivable (not assumed) \\
-\texttt{partialOrder\_acyclic} & Acyclicity of partial orders \\
-\texttt{synthesize\_well\_formed} & Proposition 1 (conditional on
-non-empty clauses) \\
-\texttt{synthesize\_preserves\_precedence} & Proposition 2 \\
-\texttt{synthesize\_static\_topology} & Proposition 3 (conditional on
-body being static) \\
-\texttt{synthesize\_completeness} & Corollary (completeness given linear
-extension) \\
-\texttt{reachable\_implies\_edge} & Lemma: reachability implies a direct
-edge (used by acyclicity) \\
-\texttt{exists\_linear\_extension} & Topological sort soundness
-(existence of linear extension) \\
-\texttt{synthesize\_eq\_manuallyNested} & Syntactic equality of
-synthesis and explicit nesting \\
-\texttt{synthesize\_equiv\_manuallyNested} & Semantic equivalence
-(Corollary: equal syntax ⇒ equal traces) \\
-\texttt{synthesize\_commutative\_two} & Semantic commutativity for
-disjoint handlers (§14.1) \\
-\end{longtable}
-}
+\begin{itemize}
+\tightlist
+\item
+  \texttt{irreflexive\_transitive\_implies\_asymmetric} --- Lemma:
+  asymmetry is derivable (not assumed)
+\item
+  \texttt{partialOrder\_acyclic} --- Acyclicity of partial orders
+\item
+  \texttt{synthesize\_well\_formed} --- Proposition 1 (conditional on
+  non-empty clauses)
+\item
+  \texttt{synthesize\_preserves\_precedence} --- Proposition 2
+\item
+  \texttt{synthesize\_static\_topology} --- Proposition 3 (conditional
+  on body being static)
+\item
+  \texttt{synthesize\_completeness} --- Corollary (completeness given
+  linear extension)
+\item
+  \texttt{reachable\_implies\_edge} --- Lemma: reachability implies a
+  direct edge (used by acyclicity)
+\item
+  \texttt{exists\_linear\_extension} --- Topological sort soundness
+  (existence of linear extension)
+\item
+  \texttt{synthesize\_eq\_manuallyNested} --- Syntactic equality of
+  synthesis and explicit nesting
+\item
+  \texttt{synthesize\_equiv\_manuallyNested} --- Semantic equivalence
+  (Corollary: equal syntax ⇒ equal traces)
+\item
+  \texttt{synthesize\_commutative\_two} --- Semantic commutativity for
+  disjoint handlers (§14.1)
+\end{itemize}
 
 \subsubsection{7.3 Assumptions}\label{assumptions}
 

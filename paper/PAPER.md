@@ -10,7 +10,7 @@ format:
   pdf:
     engine: xelatex
     linestretch: 1.15
-    latex-max-runs: 15
+    latex-max-runs: 1
 ---
 
 # Declarative Handler Topology Synthesis for Arrow Effects
@@ -497,19 +497,17 @@ The Lean model mirrors the paper's definitions:
 
 ### 7.2 Proven Theorems
 
-| Lean theorem | Paper proposition |
-|---|---|
-| `irreflexive_transitive_implies_asymmetric` | Lemma: asymmetry is derivable (not assumed) |
-| `partialOrder_acyclic` | Acyclicity of partial orders |
-| `synthesize_well_formed` | Proposition 1 (conditional on non-empty clauses) |
-| `synthesize_preserves_precedence` | Proposition 2 |
-| `synthesize_static_topology` | Proposition 3 (conditional on body being static) |
-| `synthesize_completeness` | Corollary (completeness given linear extension) |
-| `reachable_implies_edge` | Lemma: reachability implies a direct edge (used by acyclicity) |
-| `exists_linear_extension` | Topological sort soundness (existence of linear extension) |
-| `synthesize_eq_manuallyNested` | Syntactic equality of synthesis and explicit nesting |
-| `synthesize_equiv_manuallyNested` | Semantic equivalence (Corollary: equal syntax ⇒ equal traces) |
-| `synthesize_commutative_two` | Semantic commutativity for disjoint handlers (§14.1) |
+- `irreflexive_transitive_implies_asymmetric` — Lemma: asymmetry is derivable (not assumed)
+- `partialOrder_acyclic` — Acyclicity of partial orders
+- `synthesize_well_formed` — Proposition 1 (conditional on non-empty clauses)
+- `synthesize_preserves_precedence` — Proposition 2
+- `synthesize_static_topology` — Proposition 3 (conditional on body being static)
+- `synthesize_completeness` — Corollary (completeness given linear extension)
+- `reachable_implies_edge` — Lemma: reachability implies a direct edge (used by acyclicity)
+- `exists_linear_extension` — Topological sort soundness (existence of linear extension)
+- `synthesize_eq_manuallyNested` — Syntactic equality of synthesis and explicit nesting
+- `synthesize_equiv_manuallyNested` — Semantic equivalence (Corollary: equal syntax ⇒ equal traces)
+- `synthesize_commutative_two` — Semantic commutativity for disjoint handlers (§14.1)
 
 ### 7.3 Assumptions
 
