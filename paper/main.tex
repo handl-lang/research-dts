@@ -1096,6 +1096,12 @@ the current \texttt{lake\ build}:
   \texttt{synthesize\_commutative\_two}, \texttt{firstHandler\_swap},
   \texttt{evalWith\_swap} --- two-handler trace commutativity;
 \item
+  \texttt{eval\_synthesize} --- \texttt{eval\ (synthesize\ b\ hs)}
+  equals \texttt{evalWith\ hs\ b};
+\item
+  \texttt{synthesize\_adjacent\_swap} --- swapping any adjacent disjoint
+  pair of handlers in the synthesized list preserves the trace;
+\item
   \texttt{profunctorCommute₂} in \texttt{SanadaTwoHandlers.lean} ---
   abstract \texttt{P₂} commutation for two independent one-operation
   handlers;
@@ -1618,8 +1624,12 @@ the concrete \texttt{Command.Equiv} equality above
 syntactic trace-equality theorem is grounded in the profunctor-level
 commutation of the handlers' right actions.
 
-The general case --- arbitrary permutations of pairwise-disjoint handler
-lists --- is left as future work. The two-handler case is fully proved.
+The two-handler case is fully proved. The \texttt{eval\_synthesize} and
+\texttt{synthesize\_adjacent\_swap} theorems in
+\texttt{Commutativity.lean} extend this to a single adjacent swap of two
+disjoint handlers inside an arbitrary surrounding list. The full
+\texttt{List.Perm} induction over arbitrary permutations of a
+pairwise-disjoint handler list is the remaining step.
 
 \subsubsection{14.2 Inferred Precedence}\label{inferred-precedence}
 
@@ -1650,7 +1660,10 @@ formalization work could verify:
 \item
   The general commutativity conjecture: for a static body, if all
   handlers in a list are pairwise clause-disjoint, then any permutation
-  of that list produces the same trace.
+  of that list produces the same trace. The adjacent-swap step
+  (\texttt{synthesize\_adjacent\_swap}) and the
+  \texttt{eval\_synthesize} connection are in place; the remaining work
+  is the \texttt{List.Perm} induction.
 \item
   Semantic equivalence under a richer operational semantics that models
   continuation capture and resumption, beyond the trace semantics

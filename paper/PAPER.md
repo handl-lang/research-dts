@@ -557,6 +557,8 @@ The repository is divided into three formalization categories so that the paper'
 - `synthesize_well_formed`, `synthesize_preserves_precedence`, `synthesize_static_topology`, `synthesize_completeness` — core synthesis correctness;
 - `synthesize_eq_manuallyNested`, `synthesize_equiv_manuallyNested` — syntactic and trace equivalence of synthesis to explicit nesting;
 - `synthesize_commutative_two`, `firstHandler_swap`, `evalWith_swap` — two-handler trace commutativity;
+- `eval_synthesize` — `eval (synthesize b hs)` equals `evalWith hs b`;
+- `synthesize_adjacent_swap` — swapping any adjacent disjoint pair of handlers in the synthesized list preserves the trace;
 - `profunctorCommute₂` in `SanadaTwoHandlers.lean` — abstract `P₂` commutation for two independent one-operation handlers;
 - `handler_commute_iff_profunctor_commute`, `handler_diamond_commute` in `Sanada.lean` and `SanadaStrong.lean` — abstract profunctor-level iff and diamond theorems.
 
@@ -859,7 +861,7 @@ A counterexample demonstrates that the disjointness condition is necessary: when
 
 The same two-handler equivalence has a categorical certificate in the Sanada formalization. `SanadaBridge.lean` shows that `ProfunctorCommute2` for the two-operation promonad model implies the concrete `Command.Equiv` equality above (`Commutativity_from_ProfunctorCommute2`). In other words, the syntactic trace-equality theorem is grounded in the profunctor-level commutation of the handlers' right actions.
 
-The general case — arbitrary permutations of pairwise-disjoint handler lists — is left as future work. The two-handler case is fully proved.
+The two-handler case is fully proved. The `eval_synthesize` and `synthesize_adjacent_swap` theorems in `Commutativity.lean` extend this to a single adjacent swap of two disjoint handlers inside an arbitrary surrounding list. The full `List.Perm` induction over arbitrary permutations of a pairwise-disjoint handler list is the remaining step.
 
 ### 14.2 Inferred Precedence
 
@@ -875,7 +877,7 @@ A synthesis pass could eliminate redundant handlers, merge compatible handlers, 
 
 The Lean formalization (§7) establishes both structural and semantic correctness of synthesis: well-formedness, precedence preservation, staticity, completeness, existence of linear extensions, semantic equivalence between synthesized and manually nested terms (§7.2), and two-handler commutativity for disjoint handlers (§14.1). Further formalization work could verify:
 
-1. The general commutativity conjecture: for a static body, if all handlers in a list are pairwise clause-disjoint, then any permutation of that list produces the same trace.
+1. The general commutativity conjecture: for a static body, if all handlers in a list are pairwise clause-disjoint, then any permutation of that list produces the same trace. The adjacent-swap step (`synthesize_adjacent_swap`) and the `eval_synthesize` connection are in place; the remaining work is the `List.Perm` induction.
 2. Semantic equivalence under a richer operational semantics that models continuation capture and resumption, beyond the trace semantics currently formalized.
 3. A full Sanada arrow-calculus interpretation connecting the abstract strong-promonad model to every `Dts` command, beyond the two-handler fragment already bridged in `SanadaBridge.lean`.
 

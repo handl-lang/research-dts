@@ -109,12 +109,37 @@ end Counterexample
 
 section FutureWork
 /-
-General conjecture: for a static body, if `ordered` and `ordered'` are two
-lists of handlers that are pairwise disjoint in their handled operation
-names, then `eval (synthesize body ordered) = eval (synthesize body ordered')`.
-This would follow from `evalWith_swap` together with a permutation/insertion
-argument over the handler list. The two-handler case is fully proved above.
+Generalization: for a static body, if `ordered` and `ordered'` are two lists
+of handlers that are pairwise disjoint in their handled operation names and
+one is a permutation of the other, then `eval (synthesize body ordered) =
+eval (synthesize body ordered')`. The single adjacent step is now in
+`synthesize_adjacent_swap`; the full `List.Perm` induction remains future work.
 -/
+
+/-- General fact: `synthesize` simply prepends the handler list as the
+    `evalWith` context (innermost first). -/
+theorem eval_synthesize (b : Command) (hs : List Handler) :
+    eval (synthesize b hs) = evalWith hs b := by
+  induction hs generalizing b with
+  | nil =>
+    simp [synthesize, eval]
+  | cons h hs ih =>
+    unfold synthesize
+    change eval (synthesize (b.handle h) hs) = evalWith (h :: hs) b
+    rw [ih (b.handle h)]
+    simp [evalWith]
+
+/-- Adjacent-swap generalization: if `h1` and `h2` are disjoint, swapping them
+    anywhere in the handler list does not change the trace of the synthesized
+    static program. -/
+theorem synthesize_adjacent_swap (body : Command) (pre post : List Handler)
+    (h1 h2 : Handler) (d : disjointClauses h1 h2) :
+    eval (synthesize body (pre ++ [h1, h2] ++ post)) =
+    eval (synthesize body (pre ++ [h2, h1] ++ post)) := by
+  rw [eval_synthesize, eval_synthesize]
+  rw [List.append_assoc pre [h1, h2] post]
+  rw [List.append_assoc pre [h2, h1] post]
+  exact evalWith_swap (c := body) d pre post
 end FutureWork
 
 end TopologySynthesis
