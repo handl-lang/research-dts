@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this software or the accompanying formalization, please cite the paper below."
+type: software
+title: "Declarative Topology Synthesis (DTS)"
+abstract: "Research software and Lean 4 formalization for declarative handler-topology synthesis in effect-handler languages with arrows. The project contains a mechanically verified topological-sort soundness proof and a Python reference implementation of the synthesis pipeline."
+authors:
+  - family-names: "Emidio"
+    given-names: "Luis"
+    email: "luisfuturist@gmail.com"
+repository-code: "https://github.com/luisfuturist/dts"
+license: MIT
+version: 0.1.0
+date-released: 2025-08-23
+keywords:
+  - algebraic effects
+  - effect handlers
+  - arrows
+  - topology synthesis
+  - topological sort
+  - Lean 4
+  - formal verification
+preferred-citation:
+  type: unpublished
+  title: "Declarative Handler Topology Synthesis for Arrow Effects"
+  authors:
+    - family-names: "Emidio"
+      given-names: "Luis"
+  year: 2025
