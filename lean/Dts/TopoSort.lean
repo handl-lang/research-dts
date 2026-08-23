@@ -20,18 +20,18 @@ theorem filter_length_lt_of_mem (a : Handler) (l : List Handler) (h : a ∈ l) :
   | cons x rest ih =>
     by_cases xeq : x = a
     · -- x = a: filter removes x
-      have hdec : ¬ decide (x ≠ a) = true := by rw [xeq]; simp
-      rw [List.filter_cons, if_neg hdec]
-      have : (List.filter (· ≠ a) rest).length ≤ rest.length := List.length_filter_le _ _
-      simp [List.length_cons]; omega
+      have hadd := @List.length_eq_length_filter_add _ rest (fun (y : Handler) => decide (y ≠ a))
+      simp [xeq, hadd, List.length_cons, ne_eq, decide_not]
     · -- x ≠ a: filter keeps x
-      have hdec : decide (x ≠ a) = true := by rw [xeq]; simp
-      rw [List.filter_cons, if_pos hdec, List.length_cons]
       have h_in_rest : a ∈ rest := by
+        simp [List.mem_cons] at h
         obtain h_eq | h_in := h
-        · exact absurd h_eq.symm xeq
+        · -- a = x contradicts x ≠ a
+          exfalso
+          exact xeq h_eq.symm
         · exact h_in
-      have := ih h_in_rest
+      have hlt := ih h_in_rest
+      simp [xeq, List.length_cons, ne_eq, decide_not] at hlt ⊢
       omega
 
 /-- Helper: strong induction on list length. -/
