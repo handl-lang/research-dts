@@ -64,6 +64,42 @@ def eval₁' (S₁ γ₁ δ₁ _S₂ _γ₂ _δ₂ : Type) {B0 : Type} (h₁ : �
     (t : Term S₁ γ₁ δ₁ B0) : B0 :=
   SanadaParameterized.eval S₁ γ₁ δ₁ h₁ t
 
+/-- The two one-op handlers commute on a closed `Term₂ B₀`.
+    This is the value-level content of the `P₂` diamond. -/
+lemma eval_commute (S₁ γ₁ δ₁ S₂ γ₂ δ₂ : Type) {B0 : Type}
+    (h₁ : γ₁ → δ₁) (h₂ : γ₂ → δ₂) (b : Term₂ S₁ γ₁ δ₁ S₂ γ₂ δ₂ B0) :
+    eval₂' S₁ γ₁ δ₁ S₂ γ₂ δ₂ h₂ (eval₁ S₁ γ₁ δ₁ S₂ γ₂ δ₂ h₁ b) =
+    eval₁' S₁ γ₁ δ₁ S₂ γ₂ δ₂ h₁ (eval₂ S₁ γ₁ δ₁ S₂ γ₂ δ₂ h₂ b) := by
+  induction b with
+  | pure b =>
+    simp [eval₁, eval₂, eval₁', eval₂', eval]
+  | op₁ z s k ih =>
+    simp [eval₁, eval₂, eval₁', eval₂']
+    apply ih (h₁ z, s)
+  | op₂ z s k ih =>
+    simp [eval₁, eval₂, eval₁', eval₂']
+    apply ih (h₂ z, s)
+
+/-- The `P₂` diamond commutes for any term of values. -/
+lemma profunctor_commute_term (S₁ γ₁ δ₁ S₂ γ₂ δ₂ : Type) {B0 : Type}
+    (h₁ : γ₁ → δ₁) (h₂ : γ₂ → δ₂)
+    (t : Term₂ S₁ γ₁ δ₁ S₂ γ₂ δ₂ (Term₂ S₁ γ₁ δ₁ S₂ γ₂ δ₂ B0)) :
+    termMap₂ S₁ γ₁ δ₁ S₂ γ₂ δ₂ (eval₂' S₁ γ₁ δ₁ S₂ γ₂ δ₂ h₂)
+      (termMap₂ S₁ γ₁ δ₁ S₂ γ₂ δ₂ (eval₁ S₁ γ₁ δ₁ S₂ γ₂ δ₂ h₁) t) =
+    termMap₂ S₁ γ₁ δ₁ S₂ γ₂ δ₂ (eval₁' S₁ γ₁ δ₁ S₂ γ₂ δ₂ h₁)
+      (termMap₂ S₁ γ₁ δ₁ S₂ γ₂ δ₂ (eval₂ S₁ γ₁ δ₁ S₂ γ₂ δ₂ h₂) t) := by
+  induction t with
+  | pure b =>
+    simp [termMap₂, eval_commute]
+  | op₁ z s k ih =>
+    simp [termMap₂]
+    funext a
+    apply ih a
+  | op₂ z s k ih =>
+    simp [termMap₂]
+    funext a
+    apply ih a
+
 /-- Concrete `ProfunctorCommute2` certificate for two disjoint handlers:
     handling `op₁` then `op₂` is the same as handling `op₂` then `op₁` at the
     level of `P₂` continuations. -/
@@ -74,6 +110,6 @@ theorem profunctorCommute₂ (S₁ γ₁ δ₁ S₂ γ₂ δ₂ : Type) {A B0 : 
       (rmap₂ S₁ γ₁ δ₁ S₂ γ₂ δ₂ (eval₁ S₁ γ₁ δ₁ S₂ γ₂ δ₂ h₁) p) x =
     rmap₂ S₁ γ₁ δ₁ S₂ γ₂ δ₂ (eval₁' S₁ γ₁ δ₁ S₂ γ₂ δ₂ h₁)
       (rmap₂ S₁ γ₁ δ₁ S₂ γ₂ δ₂ (eval₂ S₁ γ₁ δ₁ S₂ γ₂ δ₂ h₂) p) x := by
-  sorry
+  simp [rmap₂, profunctor_commute_term]
 
 end SanadaTwoHandlers
