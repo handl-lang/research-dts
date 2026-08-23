@@ -4,15 +4,12 @@ Tests for the precedence parser — explicit `before` relations and numeric
 priority sugar, including mixed specs, error cases, and edge cases.
 
 Run:
-    python3 src/test_precedence_parser.py
+    uv run python tests/test_precedence_parser.py
 """
 
 import sys
-import os
 
-sys.path.insert(0, os.path.dirname(__file__))
-
-from precedence_parser import (
+from dts.precedence_parser import (
     parse_spec, format_spec, ParseError, Handler, Spec,
     _derive_priority_constraints, _merge_constraints,
 )

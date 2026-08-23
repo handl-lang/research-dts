@@ -1,3 +1,10 @@
+# Lean
+lean/.lake
 /.lake
-__pycache__/
 
+# Python
+__pycache__/
+python/.venv
+.venv/
+*.egg-info
+.pytest_cache
