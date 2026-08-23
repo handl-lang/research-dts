@@ -1,0 +1,1428 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\PassOptionsToPackage{dvipsnames,svgnames,x11names}{xcolor}
+\documentclass[
+  11pt,
+]{article}
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{listings}
+\newcommand{\passthrough}[1]{#1}
+\lstset{defaultdialect=[5.3]Lua}
+\lstset{defaultdialect=[x86masm]Assembler}
+\usepackage{longtable,booktabs,array}
+\usepackage{caption}
+\captionsetup[table]{skip=6pt}
+\newcounter{none} % for unnumbered tables
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+% fallback for those not using the hyperref driver hyperxmp:
+\makeatletter
+\@ifundefined{xmpquote}{\newcommand{\xmpquote}[1]{#1}}{}
+\makeatother
+\hypersetup{
+  pdftitle={Declarative Handler Topology Synthesis for Arrow Effects},
+  pdfauthor={Luis Emidio},
+  colorlinks=true,
+  linkcolor={blue},
+  filecolor={Maroon},
+  citecolor={blue},
+  urlcolor={blue},
+  pdfcreator={LaTeX via pandoc}}
+
+\title{Declarative Handler Topology Synthesis for Arrow Effects}
+\author{Luis Emidio}
+\date{2025-08-23}
+
+\begin{document}
+\maketitle
+
+\section{Abstract}\label{abstract}
+
+Algebraic effects and handlers provide a modular mechanism for
+separating the declaration of computational operations from their
+interpretation. In Sanada's calculus of algebraic effects and handlers
+for arrows, handler composition is represented explicitly by nested
+\passthrough{\lstinline!handle!} expressions. This representation
+exposes an important practical question: can handler topology be
+specified declaratively and synthesized statically, rather than written
+manually as nested syntax?
+
+We present a declarative handler-topology system layered above Sanada's
+arrow calculus. A declarative specification describes a finite set of
+handlers together with precedence constraints. A compile-time synthesis
+pass converts this specification into a linearly nested sequence of
+\passthrough{\lstinline!handle!} expressions accepted by the underlying
+arrow calculus. The synthesis problem is therefore formulated as finding
+a linear extension of a handler-precedence partial order, rather than
+constructing a branching runtime computation.
+
+This distinction is important because the expressiveness limitation
+identified by Sanada concerns effectful command branching within the
+arrow semantics. Our synthesis mechanism introduces no such runtime
+branching: it generates a fixed handler topology before execution. We
+formalize the synthesis transformation, characterize its well-formedness
+and precedence-preservation properties, and describe an implementation
+strategy for arrow-effect languages that lowers declarative
+specifications directly to existing handler-expression AST nodes. The
+resulting system requires no new runtime mechanism and preserves the
+semantic boundary imposed by the underlying arrow calculus.
+
+\section{1. Introduction}\label{introduction}
+
+Algebraic effects allow programs to describe operations independently of
+their interpretation. Effect handlers subsequently determine how those
+operations are handled. This separation provides a useful foundation for
+modular programming, but the composition of handlers remains an explicit
+part of the program structure.
+
+In Sanada's calculus for algebraic effects and handlers for arrows,
+handler composition is expressed by nested
+\passthrough{\lstinline!handle!} constructs:
+
+\begin{lstlisting}
+handle (handle P with H₁) with H₂
+\end{lstlisting}
+
+The nesting determines handler scope and therefore potentially affects
+program behavior. The programmer must consequently encode the desired
+handler topology directly in the term.
+
+We investigate whether this topology can instead be specified
+declaratively.
+
+The problem considered in this paper is narrower than general topology
+synthesis. We do not attempt to infer arbitrary computational graphs,
+physical layouts, or dynamic effect-routing structures. Rather, we
+consider the specific problem of \textbf{synthesizing the static nesting
+topology of arrow effect handlers}.
+
+Our central observation is that the synthesis problem is naturally
+expressed as an ordering problem. Given a finite collection of handlers
+and constraints describing their relative precedence, the compiler can
+compute a linear extension of those constraints and generate the
+corresponding nested \passthrough{\lstinline!handle!} expression.
+
+This approach is compatible with the structural restriction of the arrow
+calculus. In the semantic setting considered by Sanada, the algebraic
+structure associated with arrows corresponds to a sequence of operations
+rather than the branching operation trees associated with ordinary
+monads. In particular, the problematic case is runtime branching between
+effectful commands. Our synthesis pass does not introduce such
+branching: its output is a statically determined sequence of nested
+handlers.
+
+The contributions of this paper are:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{A declarative handler-topology model.} We define handler
+  declarations independently of their syntactic nesting and express
+  precedence as a relation over handlers.
+\item
+  \textbf{A static synthesis algorithm.} We reduce handler-topology
+  synthesis to finding a linear extension of the declared precedence
+  relation and lower the result to nested
+  \passthrough{\lstinline!handle!} expressions.
+\item
+  \textbf{Structural correctness properties.} We establish that
+  synthesis produces valid arrow-calculus terms and preserves declared
+  handler precedence.
+\item
+  \textbf{A minimal implementation.} We describe a compile-time AST
+  transformation for arrow-effect languages that reuses existing handler
+  representations and virtual machines.
+\item
+  \textbf{An explicit expressiveness boundary.} We distinguish static
+  synthesis, which produces a fixed handler topology, from runtime
+  dynamic selection of effectful computations, which lies outside the
+  arrow semantics considered here.
+\item
+  \textbf{A Lean 4 formalization.} The correctness properties are
+  mechanically verified in Lean 4 with no admitted proofs (§7).
+\end{enumerate}
+
+\section{2. Background}\label{background}
+
+\subsection{2.1 Sanada's Arrow Calculus}\label{sanadas-arrow-calculus}
+
+Sanada extends the arrow calculus of Lindley, Wadler, and Yallop with
+operations and handlers.
+
+The relevant syntax (Figure 2 of the thesis) is:
+
+\begin{lstlisting}
+Terms       M, N, L ::= x | ⟨M, N⟩ | fst M | snd M | λx:A. M | M N | λ•x:A. P
+Values      V, W    ::= x | ⟨V, W⟩ | λx:A. M | λ•x:A. P
+Commands    P, Q, R ::= ⌊M⌋ | let x ⇐ P in Q | L • M | op(M) | handle R with H
+Handlers    H       ::= { x:C → P } ∪ { op, k:δ_D z:γ → Q_op }_{op ∈ Σ}
+\end{lstlisting}
+
+A handler \passthrough{\lstinline!H!} consists of a return clause
+\passthrough{\lstinline!\{ x:C → P \}!} and a set of operation clauses
+\passthrough{\lstinline!\{ op, k:δ\_D z:γ → Q\_op \}!}. Each operation
+clause binds:
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!z : γ!} --- the operation argument (arity γ);
+\item
+  \passthrough{\lstinline!k : δ\_D!} --- the continuation (coarity δ);
+\item
+  \passthrough{\lstinline!Q\_op!} --- the handler body for that
+  operation.
+\end{itemize}
+
+The construct
+
+\begin{lstlisting}
+handle R with H
+\end{lstlisting}
+
+evaluates command \passthrough{\lstinline!R!} under handler
+\passthrough{\lstinline!H!}.
+
+Handler nesting determines which handler is considered first when an
+operation is encountered. Thus the following two terms are structurally
+different:
+
+\begin{lstlisting}
+handle (handle P with H₁) with H₂
+\end{lstlisting}
+
+and:
+
+\begin{lstlisting}
+handle (handle P with H₂) with H₁
+\end{lstlisting}
+
+A declarative system must therefore synthesize this ordering explicitly.
+
+\subsection{2.2 Handler Topology}\label{handler-topology}
+
+We distinguish handler topology from computational topology.
+
+\textbf{Handler topology} is the nesting relation between effect
+handlers:
+
+\begin{lstlisting}
+H₁
+ └── H₂
+      └── H₃
+           └── P
+\end{lstlisting}
+
+\textbf{Computational topology}, by contrast, describes dependencies
+between computations.
+
+The present paper concerns only the former.
+
+This distinction is important because the system does not infer a
+dataflow graph or physical layout. Its output is a valid handler nesting
+that realizes a declaratively specified precedence relation.
+
+\subsection{2.3 Arrow Operations and Sequential
+Structure}\label{arrow-operations-and-sequential-structure}
+
+Sanada's semantic treatment of arrow effects is based on strong
+promonads. A relevant consequence is that the algebraic structure
+associated with arrows represents a sequence of operations rather than
+the branching operation trees associated with ordinary monadic effects.
+
+This restriction has two consequences for our system.
+
+First, a declarative handler topology must ultimately produce a linear
+nesting of handlers.
+
+Second, a runtime construct that dynamically chooses between effectful
+commands based on the result of another effect cannot simply be
+introduced into the arrow calculus without changing its semantic model.
+
+Our synthesis mechanism avoids both issues by computing the handler
+ordering statically.
+
+\section{3. The Declarative Handler
+Model}\label{the-declarative-handler-model}
+
+\subsection{3.1 Handler Declarations}\label{handler-declarations}
+
+Let a declarative handler specification be:
+
+\begin{lstlisting}
+D = (H, ≺)
+\end{lstlisting}
+
+where:
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!H!} is a finite set of handler declarations;
+\item
+  \passthrough{\lstinline!≺!} is a precedence relation over
+  \passthrough{\lstinline!H!}.
+\end{itemize}
+
+For example:
+
+\begin{lstlisting}
+fetch ≺ cache
+cache ≺ log
+\end{lstlisting}
+
+states that \passthrough{\lstinline!fetch!} must be nested inside
+\passthrough{\lstinline!cache!}, and \passthrough{\lstinline!cache!}
+must be nested inside \passthrough{\lstinline!log!}.
+
+The relation is not itself a nesting tree. It describes constraints on
+the eventual linear handler topology.
+
+\subsection{3.2 Partial Orders}\label{partial-orders}
+
+The precedence relation is assumed to form a partial order.
+
+Thus it must be:
+
+\begin{itemize}
+\tightlist
+\item
+  irreflexive;
+\item
+  transitive;
+\item
+  asymmetric.
+\end{itemize}
+
+If two handlers are unrelated by the declared relation, the compiler is
+free to choose either relative order, subject to any additional semantic
+requirements imposed by the implementation.
+
+If the relation contains a cycle:
+
+\begin{lstlisting}
+H₁ ≺ H₂
+H₂ ≺ H₃
+H₃ ≺ H₁
+\end{lstlisting}
+
+then no valid linear handler topology exists.
+
+The compiler must reject such a specification rather than arbitrarily
+choosing an order.
+
+\subsection{3.3 Linear Extensions}\label{linear-extensions}
+
+A \textbf{linear extension} of \passthrough{\lstinline!(H, ≺)!} is a
+sequence:
+
+\begin{lstlisting}
+H₁, H₂, ..., Hₙ
+\end{lstlisting}
+
+such that:
+
+\begin{lstlisting}
+Hᵢ ≺ Hⱼ ⇒ i < j
+\end{lstlisting}
+
+The synthesis problem is therefore:
+
+\begin{quote}
+Given a finite declarative handler specification
+\passthrough{\lstinline!(H, ≺)!}, compute a linear extension of its
+precedence relation.
+\end{quote}
+
+A standard topological-sort algorithm is sufficient for this purpose.
+
+The important point is that this is a compile-time ordering problem. No
+runtime branching is necessary.
+
+\section{4. Handler Topology
+Synthesis}\label{handler-topology-synthesis}
+
+\subsection{4.1 Synthesis Function}\label{synthesis-function}
+
+Let:
+
+\begin{lstlisting}
+S(D, P)
+\end{lstlisting}
+
+be the synthesis function that takes a declarative specification
+\passthrough{\lstinline!D!} and an arrow command
+\passthrough{\lstinline!P!}.
+
+Suppose the linear extension computed from \passthrough{\lstinline!D!}
+is:
+
+\begin{lstlisting}
+H₁, H₂, ..., Hₙ
+\end{lstlisting}
+
+The synthesized command is:
+
+\begin{lstlisting}
+handle (... handle (handle P with H₁) with H₂ ... ) with Hₙ
+\end{lstlisting}
+
+Equivalently:
+
+\begin{lstlisting}
+S(D, P) =
+  handle (...(handle (handle P with H₁) with H₂)... ) with Hₙ
+\end{lstlisting}
+
+Thus the first handler in the linear extension is the innermost handler.
+
+\subsection{4.2 Example}\label{example}
+
+Consider:
+
+\begin{lstlisting}
+events:
+
+  - handler: FetchHandler
+    handles: [fetch]
+    priority: 10
+
+  - handler: CacheHandler
+    handles: [cache]
+    priority: 20
+
+  - handler: LogHandler
+    handles: [log]
+    priority: 30
+
+body: ...
+\end{lstlisting}
+
+The priority declarations induce:
+
+\begin{lstlisting}
+FetchHandler ≺ CacheHandler ≺ LogHandler
+\end{lstlisting}
+
+The synthesizer produces:
+
+\begin{lstlisting}
+handle (
+  handle (
+    handle body with FetchHandler
+  ) with CacheHandler
+) with LogHandler
+\end{lstlisting}
+
+The declarative representation therefore describes the ordering
+constraint without requiring the programmer to manually encode the
+nesting.
+
+\subsection{4.3 Priority as a Convenience
+Syntax}\label{priority-as-a-convenience-syntax}
+
+A total numeric priority is one convenient way to specify a precedence
+relation:
+
+\begin{lstlisting}
+priority(H₁) < priority(H₂)
+\end{lstlisting}
+
+implies:
+
+\begin{lstlisting}
+H₁ ≺ H₂
+\end{lstlisting}
+
+However, priority values are not fundamental to the model.
+
+The more general representation is a partial-order specification:
+
+\begin{lstlisting}
+H₁ ≺ H₂
+H₁ ≺ H₃
+\end{lstlisting}
+
+which leaves \passthrough{\lstinline!H₂!} and
+\passthrough{\lstinline!H₃!} unordered.
+
+This distinction allows the compiler to reject genuinely contradictory
+constraints while avoiding unnecessary ordering requirements.
+
+\section{5. Synthesis Algorithm}\label{synthesis-algorithm}
+
+\subsection{5.1 Algorithm}\label{algorithm}
+
+Given:
+
+\begin{lstlisting}
+D = (H, ≺)
+\end{lstlisting}
+
+and body \passthrough{\lstinline!P!}:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  Validate that \passthrough{\lstinline!≺!} is acyclic.
+\item
+  Compute a linear extension of \passthrough{\lstinline!≺!}.
+\item
+  Initialize \passthrough{\lstinline!R = P!}.
+\item
+  For each handler in the linear extension, from innermost to outermost:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    construct a \passthrough{\lstinline!handle!} node containing
+    \passthrough{\lstinline!R!};
+  \item
+    replace \passthrough{\lstinline!R!} with the new node.
+  \end{itemize}
+\item
+  Return \passthrough{\lstinline!R!}.
+\end{enumerate}
+
+In pseudocode:
+
+\begin{lstlisting}
+synthesize(D, P):
+    ordered = topological_sort(D.precedence)
+
+    result = P
+
+    for H in ordered:
+        result = handle(result, H)
+
+    return result
+\end{lstlisting}
+
+\subsection{5.2 Complexity}\label{complexity}
+
+Let:
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!n = |H|!} be the number of handlers;
+\item
+  \passthrough{\lstinline!m = |≺|!} be the number of precedence
+  constraints.
+\end{itemize}
+
+Using a standard topological-sort algorithm, ordering requires:
+
+\begin{lstlisting}
+O(n + m)
+\end{lstlisting}
+
+time.
+
+Constructing the resulting nested AST requires:
+
+\begin{lstlisting}
+O(n)
+\end{lstlisting}
+
+additional time.
+
+Thus the synthesis phase is linear in the size of the handler
+specification, assuming the precedence relation is represented
+explicitly.
+
+\subsection{5.3 Determinism and Multiple Linear
+Extensions}\label{determinism-and-multiple-linear-extensions}
+
+A partial order may have multiple valid linear extensions. For example,
+given:
+
+\begin{lstlisting}
+A ≺ C
+B ≺ C
+\end{lstlisting}
+
+both \passthrough{\lstinline![A, B, C]!} and
+\passthrough{\lstinline![B, A, C]!} are valid linear extensions. The
+choice between them affects which of \passthrough{\lstinline!A!} or
+\passthrough{\lstinline!B!} is the innermost handler, which may in turn
+affect runtime behavior if \passthrough{\lstinline!A!} and
+\passthrough{\lstinline!B!} intercept overlapping operations.
+
+For reproducible builds, the compiler can impose a deterministic
+tie-breaking rule, such as declaration order or handler identifier.
+
+This does not change the declared precedence relation:
+
+\begin{lstlisting}
+H₁ ≺ H₂
+\end{lstlisting}
+
+remains mandatory, while unrelated handlers receive a deterministic but
+otherwise arbitrary ordering.
+
+The question of when two handlers can be safely reordered without
+changing behavior is a semantic question (see §14.1).
+
+\section{6. Correctness}\label{correctness}
+
+The central correctness properties concern the relationship between the
+declarative specification and the generated syntax.
+
+\subsection{6.1 Well-Formedness}\label{well-formedness}
+
+We define a command as \textbf{well-formed} if every handler in it has
+at least one operation clause and all sub-terms are well-formed. This is
+a structural property checked recursively:
+
+\begin{lstlisting}
+isWellFormed(handle P with H) = |H.clauses| > 0 ∧ isWellFormed(P)
+isWellFormed(let x ⇐ P in Q)   = isWellFormed(P) ∧ isWellFormed(Q)
+isWellFormed(cond P Q R)       = isWellFormed(P) ∧ isWellFormed(Q) ∧ isWellFormed(R)
+isWellFormed(op(M))            = true
+isWellFormed(⌊M⌋)              = true
+\end{lstlisting}
+
+\textbf{Proposition 1 --- Well-Formedness.}
+
+For every finite acyclic handler specification
+\passthrough{\lstinline!D = (H, ≺)!} and well-formed command
+\passthrough{\lstinline!P!}, if every handler in the linear extension of
+\passthrough{\lstinline!≺!} has at least one clause, then
+\passthrough{\lstinline!S(D, P)!} is well-formed.
+
+\textbf{Proof sketch.}
+
+The synthesis folds \passthrough{\lstinline!handle!} over the linear
+extension. Each step wraps the current term with a handler
+\passthrough{\lstinline!Hᵢ!} that has at least one clause. By the
+definition of \passthrough{\lstinline!isWellFormed!}, wrapping a
+well-formed term with a handler that has clauses preserves
+well-formedness. Induction over the handler sequence establishes the
+result. The accompanying Lean formalization proves this as
+\passthrough{\lstinline!synthesize\_well\_formed!}.
+
+\subsection{6.2 Precedence Preservation}\label{precedence-preservation}
+
+\textbf{Proposition 2 --- Precedence Preservation.}
+
+For every pair of handlers \passthrough{\lstinline!Hᵢ!} and
+\passthrough{\lstinline!Hⱼ!}:
+
+\begin{lstlisting}
+Hᵢ ≺ Hⱼ
+\end{lstlisting}
+
+implies that \passthrough{\lstinline!Hᵢ!} is nested inside
+\passthrough{\lstinline!Hⱼ!} in \passthrough{\lstinline!S(D, P)!}.
+
+\textbf{Proof sketch.}
+
+The synthesis algorithm uses a linear extension of
+\passthrough{\lstinline!≺!}. By definition of a linear extension:
+
+\begin{lstlisting}
+Hᵢ ≺ Hⱼ ⇒ position(Hᵢ) < position(Hⱼ)
+\end{lstlisting}
+
+Since handlers are folded from the innermost position toward the
+outermost position, \passthrough{\lstinline!Hᵢ!} is constructed before
+\passthrough{\lstinline!Hⱼ!} and is therefore nested inside it.
+
+The key invariant is that if \passthrough{\lstinline!Hᵢ!} appears before
+\passthrough{\lstinline!Hⱼ!} in the ordered list, then for any body
+term, \passthrough{\lstinline!Hᵢ!} is nested inside
+\passthrough{\lstinline!Hⱼ!} in the result of folding
+\passthrough{\lstinline!handle!} over that list. This is proved by
+induction on the \passthrough{\lstinline!AppearsBefore!} relation, with
+two helper lemmas handling the fold accumulation pattern. The
+accompanying Lean formalization proves this as
+\passthrough{\lstinline!synthesize\_preserves\_precedence!}.
+
+\textbf{Corollary --- Completeness.}
+
+If \passthrough{\lstinline!ordered!} is a linear extension of
+\passthrough{\lstinline!≺!} (i.e.,
+\passthrough{\lstinline!∀ a b, a ≺ b ⇒ AppearsBefore(a, b, ordered)!}),
+then for every constraint \passthrough{\lstinline!Hᵢ ≺ Hⱼ!} in
+\passthrough{\lstinline!≺!}, \passthrough{\lstinline!Hᵢ!} is nested
+inside \passthrough{\lstinline!Hⱼ!} in
+\passthrough{\lstinline!synthesize(P, ordered)!}.
+
+This follows directly from Proposition 2: the linear extension property
+ensures \passthrough{\lstinline!AppearsBefore(Hᵢ, Hⱼ, ordered)!}, and
+Proposition 2 converts this into structural nesting. The Lean
+formalization proves this as
+\passthrough{\lstinline!synthesize\_completeness!}.
+
+The soundness of the topological sort --- the fact that it produces a
+list satisfying the linear extension property --- is also formally
+verified, as \passthrough{\lstinline!exists\_linear\_extension!} in
+\passthrough{\lstinline!TopoSort.lean!} (§7.2). This theorem proves that
+for any finite list of handlers with an irreflexive and transitive
+precedence relation, there exists a linear extension realizing all
+precedence constraints as \passthrough{\lstinline!AppearsBefore!}.
+
+\subsection{6.3 No Introduced Runtime
+Branching}\label{no-introduced-runtime-branching}
+
+We define a command as \textbf{static} if it contains no
+\passthrough{\lstinline!cond!} (runtime conditional branching)
+constructor. The \passthrough{\lstinline!isStatic!} predicate is checked
+recursively:
+
+\begin{lstlisting}
+isStatic(handle P with H) = isStatic(P)
+isStatic(cond P Q R)      = false
+isStatic(let x ⇐ P in Q)  = isStatic(P) ∧ isStatic(Q)
+isStatic(op(M))           = true
+isStatic(⌊M⌋)             = true
+\end{lstlisting}
+
+\textbf{Proposition 3 --- Static Topology.}
+
+If the body command \passthrough{\lstinline!P!} is static (contains no
+\passthrough{\lstinline!cond!}), then \passthrough{\lstinline!S(D, P)!}
+is also static. Synthesis introduces no runtime branching over effectful
+commands.
+
+\textbf{Proof sketch.}
+
+The synthesis function folds \passthrough{\lstinline!handle!} over the
+ordered list. Since
+\passthrough{\lstinline!isStatic(handle P with H) = isStatic(P)!},
+wrapping with a handler preserves staticity. By induction over the
+handler list, if the initial body is static, the result remains static.
+The \passthrough{\lstinline!cond!} constructor is never introduced by
+synthesis --- it only appears if it was already present in the body.
+
+The accompanying Lean formalization proves this as
+\passthrough{\lstinline!synthesize\_static\_topology!}, with the
+\passthrough{\lstinline!cond!} constructor explicitly included in the
+\passthrough{\lstinline!Command!} type to make the theorem non-vacuous.
+
+\subsection{6.4 Semantic Boundary}\label{semantic-boundary}
+
+The preceding property should not be interpreted as proving that
+arbitrary dynamic effect-routing programs can be represented in the
+arrow calculus.
+
+Rather, the result establishes a narrower fact:
+
+\begin{quote}
+A static declarative description of handler precedence can be compiled
+into the existing static handler-nesting mechanism without introducing
+the dynamic command branching excluded by the underlying arrow model.
+\end{quote}
+
+This distinction is central to the scope of the system.
+
+\section{7. Formalization in Lean 4}\label{formalization-in-lean-4}
+
+The correctness properties of §6 have been mechanically verified in Lean
+4. The formalization is split across the following files under
+\passthrough{\lstinline!Dts/!}:
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!Basic.lean!} --- core types
+  (\passthrough{\lstinline!Command!}, \passthrough{\lstinline!Handler!},
+  \passthrough{\lstinline!isStatic!},
+  \passthrough{\lstinline!isWellFormed!})
+\item
+  \passthrough{\lstinline!Precedence.lean!} --- precedence model,
+  partial orders, acyclicity
+\item
+  \passthrough{\lstinline!Synthesis.lean!} --- synthesis function,
+  well-formedness, precedence preservation, staticity, completeness
+\item
+  \passthrough{\lstinline!TopoSort.lean!} --- topological sort soundness
+  (\passthrough{\lstinline!exists\_linear\_extension!})
+\item
+  \passthrough{\lstinline!Semantics.lean!} --- trace semantics for
+  \passthrough{\lstinline!Command!} (observable handler-dispatch events)
+\item
+  \passthrough{\lstinline!SemanticEquivalence.lean!} --- semantic
+  equivalence of synthesized and manually nested terms
+\item
+  \passthrough{\lstinline!Commutativity.lean!} --- semantic
+  commutativity of disjoint handlers, with counterexample
+\end{itemize}
+
+The root \passthrough{\lstinline!Dts.lean!} imports all modules. The
+project compiles with no \passthrough{\lstinline!sorry!} (no admitted
+proofs). Mathlib is used for tactic utilities only (e.g.,
+\passthrough{\lstinline!omega!}, \passthrough{\lstinline!push\_neg!});
+no mathematical content is imported from it.
+
+\subsection{7.1 Model}\label{model}
+
+The Lean model mirrors the paper's definitions:
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!Command!} is an inductive type with
+  constructors \passthrough{\lstinline!pure!},
+  \passthrough{\lstinline!op!}, \passthrough{\lstinline!letin!},
+  \passthrough{\lstinline!handle!}, and \passthrough{\lstinline!cond!}.
+  The \passthrough{\lstinline!cond!} constructor represents runtime
+  conditional branching; its inclusion makes the staticity theorem
+  (Proposition 3) non-vacuous.
+\item
+  \passthrough{\lstinline!Precedence!} is a function
+  \passthrough{\lstinline!Handler → Handler → Bool!}.
+\item
+  \passthrough{\lstinline!synthesize body ordered!} is a left fold over
+  the ordered handler list, matching the paper's
+  \passthrough{\lstinline!S(D, P)!}.
+\item
+  \passthrough{\lstinline!AppearsBefore!} is an inductive predicate
+  capturing list ordering without relying on numeric indices.
+\item
+  \passthrough{\lstinline!NestedInside!} is an inductive predicate
+  capturing handler nesting structure.
+\end{itemize}
+
+\subsection{7.2 Proven Theorems}\label{proven-theorems}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Lean theorem
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Paper proposition
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!irreflexive\_transitive\_implies\_asymmetric!} &
+Lemma: asymmetry is derivable (not assumed) \\
+\passthrough{\lstinline!partialOrder\_acyclic!} & Acyclicity of partial
+orders \\
+\passthrough{\lstinline!synthesize\_well\_formed!} & Proposition 1
+(conditional on non-empty clauses) \\
+\passthrough{\lstinline!synthesize\_preserves\_precedence!} &
+Proposition 2 \\
+\passthrough{\lstinline!synthesize\_static\_topology!} & Proposition 3
+(conditional on body being static) \\
+\passthrough{\lstinline!synthesize\_completeness!} & Corollary
+(completeness given linear extension) \\
+\passthrough{\lstinline!reachable\_implies\_edge!} & Lemma: reachability
+implies a direct edge (used by acyclicity) \\
+\passthrough{\lstinline!exists\_linear\_extension!} & Topological sort
+soundness (existence of linear extension) \\
+\passthrough{\lstinline!synthesize\_eq\_manuallyNested!} & Syntactic
+equality of synthesis and explicit nesting \\
+\passthrough{\lstinline!synthesize\_equiv\_manuallyNested!} & Semantic
+equivalence (Corollary: equal syntax ⇒ equal traces) \\
+\passthrough{\lstinline!synthesize\_commutative\_two!} & Semantic
+commutativity for disjoint handlers (§14.1) \\
+\end{longtable}
+}
+
+\subsection{7.3 Assumptions}\label{assumptions}
+
+The formalization makes no unproven assumptions. The linear extension
+property used by \passthrough{\lstinline!synthesize\_completeness!} is
+established by \passthrough{\lstinline!exists\_linear\_extension!} in
+\passthrough{\lstinline!TopoSort.lean!}, which proves that for any
+finite list of handlers with an irreflexive and transitive precedence
+relation, a valid linear extension exists. This is a constructive
+version of a standard result in order theory (Szpilrajn's extension
+theorem).
+
+\section{8. Relationship to Arrow
+Expressiveness}\label{relationship-to-arrow-expressiveness}
+
+\subsection{8.1 Dynamic Command
+Branching}\label{dynamic-command-branching}
+
+Consider a hypothetical program:
+
+\begin{lstlisting}
+v ⇐ op()
+if v then P₁ else P₂
+\end{lstlisting}
+
+where \passthrough{\lstinline!P₁!} and \passthrough{\lstinline!P₂!} are
+effectful commands.
+
+The branch selects a future effectful computation based on the result of
+an operation. This is fundamentally different from static handler
+synthesis.
+
+Our system instead performs:
+
+\begin{lstlisting}
+compile time:
+    determine H₁ ≺ H₂ ≺ H₃
+
+execution time:
+    execute fixed nesting
+\end{lstlisting}
+
+The handler topology is therefore independent of runtime operation
+results.
+
+\subsection{8.2 Pure Term-Level
+Branching}\label{pure-term-level-branching}
+
+The restriction does not imply that all conditional behavior disappears.
+
+A pure value can still participate in ordinary term-level computation.
+The relevant distinction is whether the branch dynamically selects
+between effectful command structures.
+
+Our compiler does not need to alter this distinction.
+
+\subsection{8.3 Why the Restriction Is
+Useful}\label{why-the-restriction-is-useful}
+
+The same restriction that limits dynamic expressiveness also simplifies
+static synthesis.
+
+If arbitrary runtime command branching were permitted, the handler
+topology might itself depend on runtime execution paths. A compiler
+would then potentially need to synthesize a branching handler structure.
+
+Under the arrow model considered here, static handler topology remains a
+linear structure:
+
+\begin{lstlisting}
+H₁
+ ↓
+H₂
+ ↓
+H₃
+ ↓
+P
+\end{lstlisting}
+
+This makes compile-time synthesis particularly simple.
+
+\section{9. Declarative Language
+Design}\label{declarative-language-design}
+
+\subsection{9.1 Syntax}\label{syntax}
+
+A concrete configuration syntax can expose handler precedence without
+exposing the underlying nesting.
+
+For example:
+
+\begin{lstlisting}
+events:
+  - handler: Cache
+    before: [Logging]
+
+  - handler: Authentication
+    before: [Cache]
+
+  - handler: Logging
+
+body:
+  application
+\end{lstlisting}
+
+This corresponds to:
+
+\begin{lstlisting}
+Authentication ≺ Cache ≺ Logging
+\end{lstlisting}
+
+The configuration language need not expose
+\passthrough{\lstinline!handle!} directly.
+
+\subsection{9.2 Explicit Relations versus
+Priorities}\label{explicit-relations-versus-priorities}
+
+We recommend treating explicit precedence constraints as the semantic
+core:
+
+\begin{lstlisting}
+Authentication before Cache
+Cache before Logging
+\end{lstlisting}
+
+Numeric priorities can be provided as syntactic sugar:
+
+\begin{lstlisting}
+Authentication: 10
+Cache: 20
+Logging: 30
+\end{lstlisting}
+
+This avoids coupling the language semantics to an arbitrary numeric
+scale.
+
+\subsection{9.3 Invalid Specifications}\label{invalid-specifications}
+
+The compiler should diagnose at least:
+
+\begin{itemize}
+\tightlist
+\item
+  cyclic precedence constraints;
+\item
+  duplicate handler identities;
+\item
+  references to undefined handlers;
+\item
+  malformed handler clauses;
+\item
+  conflicting declarations.
+\end{itemize}
+
+For example:
+
+\begin{lstlisting}
+A before B
+B before A
+\end{lstlisting}
+
+must produce a compile-time error because no valid linear nesting
+satisfies both constraints.
+
+\section{10. Implementation}\label{implementation}
+
+The proposed implementation is deliberately small.
+
+The declarative frontend produces handler declarations and precedence
+constraints. A synthesis pass then transforms the existing AST before VM
+evaluation.
+
+Conceptually:
+
+\begin{lstlisting}
+Declarative specification
+          │
+          ▼
+ Handler declarations
+          │
+          ▼
+ Precedence graph
+          │
+          ▼
+ Topological sort
+          │
+          ▼
+ Nested handler expressions
+          │
+          ▼
+ Existing compiler / VM
+\end{lstlisting}
+
+The synthesis pass is therefore a pure AST transformation.
+
+A simplified implementation in pseudocode:
+
+\begin{lstlisting}
+synthesize_topology(body, handlers):
+    ordered = topological_sort(handlers.precedence)
+
+    result = body
+
+    for H in ordered:
+        result = handle(result, H)
+
+    return result
+\end{lstlisting}
+
+The implementation does not require a new runtime representation of
+handlers. The generated nodes use the existing handler-expression
+representation of the target language.
+
+Likewise, the VM continues to perform ordinary handler lookup and
+evaluation.
+
+The principal implementation advantage is therefore not that handlers
+become intrinsically cheaper, but that the declarative layer introduces
+\textbf{no additional runtime dispatch mechanism}.
+
+\section{11. Evaluation Plan}\label{evaluation-plan}
+
+\subsection{11.1 Correctness of Ordering}\label{correctness-of-ordering}
+
+Generate handler specifications with known precedence relations and
+verify that the resulting AST has the corresponding nesting.
+
+For example:
+
+\begin{lstlisting}
+A ≺ B ≺ C
+\end{lstlisting}
+
+must produce:
+
+\begin{lstlisting}
+handle(
+  handle(
+    handle(P, A),
+    B
+  ),
+  C
+)
+\end{lstlisting}
+
+\subsection{11.2 Detection of Invalid
+Topologies}\label{detection-of-invalid-topologies}
+
+Generate cyclic specifications and verify that synthesis rejects them at
+compile time.
+
+Examples include:
+
+\begin{lstlisting}
+A ≺ B
+B ≺ A
+\end{lstlisting}
+
+and:
+
+\begin{lstlisting}
+A ≺ B
+B ≺ C
+C ≺ A
+\end{lstlisting}
+
+\subsection{11.3 Behavioral Equivalence}\label{behavioral-equivalence}
+
+For specifications whose nesting is known manually, compare:
+
+\begin{lstlisting}
+manually nested program
+\end{lstlisting}
+
+with:
+
+\begin{lstlisting}
+declaratively synthesized program
+\end{lstlisting}
+
+and verify equivalent behavior under the existing VM.
+
+This experiment is more significant than simply checking the AST shape
+because handler nesting can affect which operation clause receives an
+operation.
+
+\subsection{11.4 Compilation Cost}\label{compilation-cost}
+
+Measure synthesis time as the number of handlers and precedence
+constraints increases.
+
+The expected complexity is:
+
+\begin{lstlisting}
+O(|H| + |≺|)
+\end{lstlisting}
+
+for the ordering phase.
+
+The experiment should verify that synthesis remains negligible relative
+to ordinary compilation and execution costs for realistic handler
+counts.
+
+\section{12. Relationship to Prior
+Work}\label{relationship-to-prior-work}
+
+\subsection{12.1 The Arrow Calculus}\label{the-arrow-calculus}
+
+The arrow calculus of Lindley, Wadler, and Yallop provides the
+foundational calculus for reasoning about computations with explicit
+structure.
+
+Our work does not introduce a new arrow calculus. Instead, it uses the
+existing handler mechanism as the target of a declarative compilation
+layer.
+
+\subsection{12.2 Lindley's λ\_flow}\label{lindleys-ux3bb_flow}
+
+Lindley's λ\_flow explored algebraic effects and handlers across idioms,
+arrows, and monads and provided static effect distinctions.
+
+This work is relevant because it demonstrates that effect structure can
+be exposed statically.
+
+Our contribution is different: we use a declarative specification to
+\textbf{construct the handler topology itself}.
+
+Thus the relationship can be summarized as:
+
+\begin{lstlisting}
+λ_flow
+  │
+  │ static effect structure
+  ▼
+Sanada
+  │
+  │ formal arrow handlers
+  ▼
+Declarative synthesis
+  │
+  │ handler precedence
+  ▼
+nested handle expressions
+\end{lstlisting}
+
+\subsection{12.3 Algebraic Effects and
+Handlers}\label{algebraic-effects-and-handlers}
+
+General algebraic-effects research establishes the separation between
+effect declaration and interpretation.
+
+Our system applies this principle specifically to handler composition:
+the declarative specification describes how handlers should relate,
+while the compiler determines the concrete nesting required by the
+target calculus.
+
+\section{13. Limitations}\label{limitations}
+
+The system intentionally has a narrow scope.
+
+First, it synthesizes a \textbf{static linear handler topology}. It does
+not synthesize arbitrary runtime handler graphs.
+
+Second, the current model does not attempt to infer handler precedence
+automatically from arbitrary program behavior. Precedence must either be
+declared or derived from a separately specified static policy.
+
+Third, a partial order may admit multiple valid linear extensions.
+Although deterministic tie-breaking can provide reproducible output,
+different valid extensions may have different runtime behavior when
+handlers interact. A complete system therefore needs a semantic account
+of when two handlers may be safely reordered.
+
+Fourth, the present work does not establish that every useful effect
+system can be represented by the arrow model. Its claims are restricted
+to handler topology that can be represented by the existing arrow
+calculus.
+
+Finally, the current implementation does not optimize handler
+composition. Its purpose is to establish the correctness and
+practicality of the declarative-to-nested transformation.
+
+\section{14. Future Work}\label{future-work}
+
+\subsection{14.1 Semantic Commutativity}\label{semantic-commutativity}
+
+An important question is when two handlers can safely be reordered.
+
+We provide a partial answer, formalized in
+\passthrough{\lstinline!Commutativity.lean!}. Two handlers are
+\textbf{clause-disjoint} when no operation name is handled by both:
+
+\begin{lstlisting}
+disjointClauses(H₁, H₂) := ∀ op. ¬(H₁ handles op ∧ H₂ handles op)
+\end{lstlisting}
+
+\textbf{Theorem 4 --- Two-Handler Commutativity.} For a static body
+\passthrough{\lstinline!P!}, if \passthrough{\lstinline!H₁!} and
+\passthrough{\lstinline!H₂!} are clause-disjoint, then:
+
+\begin{lstlisting}
+eval(synthesize(P, [H₁, H₂])) = eval(synthesize(P, [H₂, H₁]))
+\end{lstlisting}
+
+That is, the trace is identical regardless of which disjoint handler is
+innermost.
+
+The proof proceeds by showing that swapping two disjoint adjacent
+handlers in the handler context does not change which handler first
+catches any operation (\passthrough{\lstinline!firstHandler\_swap!}),
+and then lifting this to all static command forms by induction
+(\passthrough{\lstinline!evalWith\_swap!}).
+
+A counterexample demonstrates that the disjointness condition is
+necessary: when two handlers both handle the same operation, the
+innermost handler catches it, so reordering changes the trace.
+
+The general case --- arbitrary permutations of pairwise-disjoint handler
+lists --- is left as future work. The two-handler case is fully proved.
+
+\subsection{14.2 Inferred Precedence}\label{inferred-precedence}
+
+Some precedence constraints could potentially be inferred from operation
+signatures or handler dependencies.
+
+For example, if a handler invokes an operation that another handler must
+intercept, the compiler could derive a necessary nesting relationship.
+
+\subsection{14.3 Optimization}\label{optimization}
+
+A synthesis pass could eliminate redundant handlers, merge compatible
+handlers, or specialize handler nesting when their operation sets are
+statically known.
+
+\subsection{14.4 Beyond Formalization}\label{beyond-formalization}
+
+The Lean formalization (§7) establishes both structural and semantic
+correctness of synthesis: well-formedness, precedence preservation,
+staticity, completeness, existence of linear extensions, semantic
+equivalence between synthesized and manually nested terms (§7.2), and
+two-handler commutativity for disjoint handlers (§14.1). Further
+formalization work could verify:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  The general commutativity conjecture: for a static body, if all
+  handlers in a list are pairwise clause-disjoint, then any permutation
+  of that list produces the same trace.
+\item
+  Semantic equivalence under a richer operational semantics that models
+  continuation capture and resumption, beyond the trace semantics
+  currently formalized.
+\end{enumerate}
+
+\subsection{14.5 Beyond Total Handler
+Order}\label{beyond-total-handler-order}
+
+Although the final arrow representation is linear, future work could
+investigate richer declarative descriptions that compile into multiple
+statically selected handler configurations. For example, a specification
+might describe two alternative handler orderings guarded by a
+compile-time condition (e.g.~debug vs production mode). The compiler
+would then generate two separate nested \passthrough{\lstinline!handle!}
+expressions and select between them using permitted term-level branching
+(\passthrough{\lstinline!if M then N₁ else N₂!} where
+\passthrough{\lstinline!N₁!} and \passthrough{\lstinline!N₂!} are terms,
+not commands). This stays within the arrow calculus because the
+selection is static or term-level --- it does not introduce runtime
+branching on effectful commands. The key insight is that multiple static
+topologies can coexist as long as the choice between them does not
+depend on operation results.
+
+\section{15. Conclusion}\label{conclusion}
+
+We presented a declarative system for synthesizing handler topology in
+an arrow calculus with algebraic effects and handlers.
+
+The key idea is to separate \textbf{handler specification} from
+\textbf{handler syntax}. A programmer declares a set of handlers and a
+precedence relation. The compiler computes a linear extension of that
+relation and lowers it to the nested \passthrough{\lstinline!handle!}
+expressions required by the underlying calculus.
+
+This transformation is fundamentally static. It does not introduce
+runtime branching over effectful commands and therefore does not require
+an extension of the arrow semantic model. The synthesis problem is
+consequently reduced to a well-defined compile-time ordering problem.
+Its correctness has been mechanically verified in Lean 4 (§7), covering
+well-formedness, precedence preservation, staticity, completeness,
+semantic equivalence, and two-handler commutativity for disjoint
+handlers.
+
+The approach also provides a minimal implementation path. In a language
+with existing handler-expression AST nodes, the declarative system can
+be implemented as an AST-to-AST transformation producing those nodes.
+The existing runtime remains responsible for ordinary handler
+evaluation.
+
+The principal result is therefore not a new runtime effect mechanism,
+but a new \textbf{declarative layer for constructing an existing
+arrow-effect mechanism}. The boundary is precise:
+
+\begin{lstlisting}
+static handler topology
+        + synthesizable
+
+runtime effect-dependent command topology
+        - not introduced by this system
+\end{lstlisting}
+
+This boundary turns a limitation of arrow effects into a useful design
+constraint. Because the generated handler structure is linear and
+statically known, its synthesis is simple, deterministic, and amenable
+to formal verification.
+
+The resulting system provides a small example of a broader principle:
+when a programming language exposes a structurally constrained semantic
+representation, a declarative layer can synthesize that representation
+without changing the underlying runtime. In the present case, Sanada's
+explicit handler topology becomes not merely a syntactic requirement,
+but the target of a compile-time synthesis process.
+
+\section{References}\label{references}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Sanada, T. (2024). \emph{Algebraic effects and handlers for arrows.}
+  Journal of Functional Programming, 34. doi:10.1017/S0956796824000066
+\item
+  Sanada, T. (2024). \emph{Algebraic effects and handlers for arrows.}
+  PhD thesis, Kyoto University.
+  https://www.kurims.kyoto-u.ac.jp/\textasciitilde tsanada/papers/phdthesis.pdf
+\item
+  Lindley, S. (2014). \emph{Algebraic effects and effect handlers for
+  idioms and arrows.} In Proceedings of the 19th International
+  Conference on Functional Programming (ICFP).
+  doi:10.1145/2633628.2633636
+\item
+  Lindley, S., Wadler, P., and Yallop, J. (2010). \emph{The arrow
+  calculus.} Journal of Functional Programming, 20(1), pp.~51--87.
+\item
+  Plotkin, G. and Pretnar, M. (2013). \emph{Handling algebraic effects.}
+  Logical Methods in Computer Science, 9(4).
+\item
+  Hughes, J. (2000). \emph{Generalising monads to arrows.} Science of
+  Computer Programming, 37(1--3), pp.~67--111.
+\end{enumerate}
+
+\end{document}

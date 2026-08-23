@@ -1,0 +1,19 @@
+from: markdown
+shift-heading-level-by: -1
+standalone: true
+
+metadata:
+  author: Luis Emidio
+  date: 2025-08-23
+  geometry: margin=1in
+  fontsize: 11pt
+  documentclass: article
+  number-sections: false
+
+listings: true
+
+variables:
+  colorlinks: true
+  linkcolor: blue
+  urlcolor: blue
+  citecolor: blue

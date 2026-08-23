@@ -390,7 +390,7 @@ For every finite acyclic handler specification `D = (H, ≺)` and well-formed co
 
 **Proof sketch.**
 
-The synthesis folds `handle` over the linear extension. Each step wraps the current term with a handler `Hᵢ` that has at least one clause. By the definition of `isWellFormed`, wrapping a well-formed term with a handler that has clauses preserves well-formedness. Induction over the handler sequence establishes the result. The accompanying Lean formalization proves this as `synthesize_well_formed`. ☐
+The synthesis folds `handle` over the linear extension. Each step wraps the current term with a handler `Hᵢ` that has at least one clause. By the definition of `isWellFormed`, wrapping a well-formed term with a handler that has clauses preserves well-formedness. Induction over the handler sequence establishes the result. The accompanying Lean formalization proves this as `synthesize_well_formed`.
 
 ### 6.2 Precedence Preservation
 
@@ -444,7 +444,7 @@ If the body command `P` is static (contains no `cond`), then `S(D, P)` is also s
 
 The synthesis function folds `handle` over the ordered list. Since `isStatic(handle P with H) = isStatic(P)`, wrapping with a handler preserves staticity. By induction over the handler list, if the initial body is static, the result remains static. The `cond` constructor is never introduced by synthesis — it only appears if it was already present in the body.
 
-The accompanying Lean formalization proves this as `synthesize_static_topology`, with the `cond` constructor explicitly included in the `Command` type to make the theorem non-vacuous. ☐
+The accompanying Lean formalization proves this as `synthesize_static_topology`, with the `cond` constructor explicitly included in the `Command` type to make the theorem non-vacuous.
 
 ### 6.4 Semantic Boundary
 
@@ -862,10 +862,10 @@ The principal result is therefore not a new runtime effect mechanism, but a new 
 
 ```text
 static handler topology
-        ✓ synthesizable
+        + synthesizable
 
 runtime effect-dependent command topology
-        ✗ not introduced by this system
+        - not introduced by this system
 ```
 
 This boundary turns a limitation of arrow effects into a useful design constraint. Because the generated handler structure is linear and statically known, its synthesis is simple, deterministic, and amenable to formal verification.
