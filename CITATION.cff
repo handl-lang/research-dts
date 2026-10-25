@@ -7,7 +7,7 @@ authors:
   - family-names: "Emidio"
     given-names: "Luis"
     email: "luisfuturist@gmail.com"
-repository-code: "https://github.com/luisfuturist/dts"
+repository-code: "https://github.com/handl-lang/research-dts"
 license: MIT
 version: 0.1.0
 date-released: 2025-08-23

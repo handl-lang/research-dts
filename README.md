@@ -1,8 +1,8 @@
 # Declarative Topology Synthesis (DTS)
 
-[![Lean CI](https://github.com/luisfuturist/dts/actions/workflows/lean_action_ci.yml/badge.svg)](https://github.com/luisfuturist/dts/actions/workflows/lean_action_ci.yml)
-[![Python CI](https://github.com/luisfuturist/dts/actions/workflows/python_ci.yml/badge.svg)](https://github.com/luisfuturist/dts/actions/workflows/python_ci.yml)
-[![Paper CI](https://github.com/luisfuturist/dts/actions/workflows/paper_ci.yml/badge.svg)](https://github.com/luisfuturist/dts/actions/workflows/paper_ci.yml)
+[![Lean CI](https://github.com/handl-lang/research-dts/actions/workflows/lean_action_ci.yml/badge.svg)](https://github.com/handl-lang/research-dts/actions/workflows/lean_action_ci.yml)
+[![Python CI](https://github.com/handl-lang/research-dts/actions/workflows/python_ci.yml/badge.svg)](https://github.com/handl-lang/research-dts/actions/workflows/python_ci.yml)
+[![Paper CI](https://github.com/handl-lang/research-dts/actions/workflows/paper_ci.yml/badge.svg)](https://github.com/handl-lang/research-dts/actions/workflows/paper_ci.yml)
 
 Research project on **declarative handler topology synthesis** for functional programming languages with algebraic effects and handlers. The central goal is to let programmers specify *which handler wraps which* as a precedence relation, and have the compiler synthesize the correct nested `handle` structure statically.
 
@@ -121,3 +121,13 @@ This project is released under the [MIT License](LICENSE). If you use this softw
 - `lean/ListDigraph/` — self-hosted list-based topological sort package.
 - `python/tests/` — executable tests and case studies.
 - `project/TODO.md` — implementation and evaluation task list.
+
+## Documentation
+
+Published site (Diátaxis): <https://handl-lang.github.io/docs/research-dts/>
+
+- [Reference](https://handl-lang.github.io/docs/research-dts/reference/) — Lean modules, Python API, paper targets
+- [How-to](https://handl-lang.github.io/docs/research-dts/how-to/) — build the proof, run the pipeline, rebuild the paper
+- [Explanation](https://handl-lang.github.io/docs/research-dts/explanation/) — why a static ordering is sound
+
+Implementation and evaluation tasks: `project/TODO.md`.
