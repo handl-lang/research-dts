@@ -142,4 +142,94 @@ theorem synthesize_adjacent_swap (body : Command) (pre post : List Handler)
   exact evalWith_swap (c := body) d pre post
 end FutureWork
 
+section Permutation
+
+/-- A list of handlers is pairwise clause-disjoint when any two distinct
+    handlers in the list handle disjoint operation sets. -/
+def pairwiseDisjoint (hs : List Handler) : Prop :=
+  ∀ (h1 h2 : Handler), h1 ∈ hs → h2 ∈ hs → h1 ≠ h2 → disjointClauses h1 h2
+
+theorem perm_mem {l l' : List Handler} (h : List.Perm l l') (a : Handler) : a ∈ l ↔ a ∈ l' := by
+  induction h with
+  | nil =>
+    simp
+  | cons b h ih =>
+    simp [ih]
+  | swap x y l =>
+    simp
+    tauto
+  | trans h1 h2 ih1 ih2 =>
+    exact ih1.trans ih2
+
+/-- Pairwise disjointness is preserved under permutation. -/
+theorem pairwiseDisjoint_of_perm {l l' : List Handler} (h : List.Perm l l') :
+    pairwiseDisjoint l ↔ pairwiseDisjoint l' := by
+  constructor
+  · intro hp h1 h2 h1' h2' hne
+    have h1l : h1 ∈ l := (perm_mem h h1).mpr h1'
+    have h2l : h2 ∈ l := (perm_mem h h2).mpr h2'
+    exact hp h1 h2 h1l h2l hne
+  · intro hp h1 h2 h1l h2l hne
+    have h1' : h1 ∈ l' := (perm_mem h h1).mp h1l
+    have h2' : h2 ∈ l' := (perm_mem h h2).mp h2l
+    exact hp h1 h2 h1' h2' hne
+
+/-- Permuting a pairwise-disjoint handler list does not change the trace of
+    the synthesized program. This completes the `List.Perm` induction left as
+    future work in `synthesize_adjacent_swap`. -/
+theorem synthesize_perm (body : Command) (ordered ordered' : List Handler)
+    (h_perm : List.Perm ordered ordered')
+    (h_pairwise : pairwiseDisjoint ordered) :
+    eval (synthesize body ordered) = eval (synthesize body ordered') := by
+  revert h_pairwise
+  revert body
+  induction h_perm with
+  | nil =>
+    intro body h_pairwise
+    simp [synthesize, eval, List.foldl_nil]
+  | cons a h ih =>
+    intro body h_pairwise
+    rename_i l l'
+    have hpl : pairwiseDisjoint l := by
+      intro h1 h2 h1l h2l hne
+      exact h_pairwise h1 h2 (List.mem_cons_of_mem _ h1l) (List.mem_cons_of_mem _ h2l) hne
+    have eq1 : synthesize body (a :: l) = synthesize (Command.handle body a) l := by
+      unfold synthesize
+      rw [List.foldl_cons]
+    have eq2 : synthesize body (a :: l') = synthesize (Command.handle body a) l' := by
+      unfold synthesize
+      rw [List.foldl_cons]
+    rw [eq1, eq2]
+    exact ih (Command.handle body a) hpl
+  | swap x y l =>
+    intro body h_pairwise
+    by_cases heq : x = y
+    · -- x = y: the two lists are identical
+      rw [heq]
+    · -- x ≠ y: apply the two-handler adjacent-swap theorem
+      have hxy : disjointClauses y x := by
+        apply h_pairwise y x
+        · simp
+        · simp
+        · exact Ne.symm heq
+      rw [eval_synthesize body (y :: x :: l), eval_synthesize body (x :: y :: l)]
+      exact evalWith_swap hxy (c := body) [] l
+  | trans h1 h2 ih1 ih2 =>
+    intro body h_pairwise
+    rename_i l1 l2 l3
+    have hpl2 : pairwiseDisjoint l2 := (pairwiseDisjoint_of_perm h1).mp h_pairwise
+    have eq1 := ih1 body h_pairwise
+    have eq2 := ih2 body hpl2
+    exact Eq.trans eq1 eq2
+
+/-- `Command.Equiv` version of the permutation invariance. -/
+theorem synthesize_perm_equiv (body : Command) (ordered ordered' : List Handler)
+    (h_perm : List.Perm ordered ordered')
+    (h_pairwise : pairwiseDisjoint ordered) :
+    Command.Equiv (synthesize body ordered) (synthesize body ordered') := by
+  rw [Command.Equiv]
+  exact synthesize_perm body ordered ordered' h_perm h_pairwise
+
+end Permutation
+
 end TopologySynthesis

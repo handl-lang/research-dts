@@ -6,11 +6,5 @@ import Dts.Synthesis
 import Dts.TopoSort
 import Dts.Semantics
 import Dts.SemanticEquivalence
-import Dts.Commutativity
-import Dts.Sanada
-import Dts.SanadaStrong
-import Dts.SanadaSpec
-import Dts.SanadaParameterized
-import Dts.SanadaTwoHandlers
-import Dts.SanadaBridge
-import Dts.EffectBridge
+import Dts.EffectInterface
+import Dts.EvalRel
