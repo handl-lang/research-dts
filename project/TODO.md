@@ -1,3 +1,9 @@
+---
+title: DTS — Implementation & Evaluation Tasks
+type: task
+date: 2026-08-22
+---
+
 # DTS — Implementation & Evaluation Tasks
 
 ## Working compiler pass
