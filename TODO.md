@@ -2,6 +2,8 @@
 
 ## Working compiler pass
 
+- [ ] T-014 archived repo: local gate commit 8a130e1 can't push — decide fate · created:2026-10-31
+
 ## Case studies
 
 ## Evaluation infrastructure
