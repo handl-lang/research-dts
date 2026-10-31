@@ -2,12 +2,9 @@
 
 ## Working compiler pass
 
-
 ## Case studies
 
-
 ## Evaluation infrastructure
-
 
 ## Benchmarks
 
@@ -29,7 +26,7 @@
 
 ## Next steps surfaced from the 2026-10-30 formalization pass
 
-- [ ] T-010 Prove the full List.Perm generalization for static body and any permutation of pairwise-disjoint handler list (adjacent-swap step and eval_synthesize bridge already in place)
+- [ ] T-010 Prove the full List.Perm generalization for static body and any permutation of pairwise-disjoint handler list (adjacent-swap step and eval\_synthesize bridge already in place)
 - [ ] T-011 Complete the full Sanada arrow-calculus interpretation for every Dts command beyond the two-handler bridge and concrete get/log fragment
 
 ## Repo state (from 2026-10-29 cleanup)
