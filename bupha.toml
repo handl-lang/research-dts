@@ -1,0 +1,18 @@
+# bupha.toml — committed CI manifest for handl-lang/research-dts.
+#
+# Runner is this repo's ci.sh (lake build + uv python tests). Merge the
+# [[repos]] entry into the shared watcher (~/.config/bupha/bupha.toml) or
+# run: bupha watch --config bupha.toml
+
+[[repos]]
+name = "handl-lang/research-dts"
+dir = "/home/luis/GitHub/handl-lang/research-dts"
+branch = "refs/heads/main"
+  [repos.runner]
+  kind = "script"
+  cmd = "bash ci.sh"
+  cancel_running = true
+
+[status]
+kind = "github"
+context = "ci/bupha"
