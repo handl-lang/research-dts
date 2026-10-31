@@ -1,10 +1,4 @@
----
-title: DTS — Implementation & Evaluation Tasks
-type: task
-date: 2026-08-22
----
-
-# DTS — Implementation & Evaluation Tasks
+# TODO — research-dts
 
 ## Working compiler pass
 
