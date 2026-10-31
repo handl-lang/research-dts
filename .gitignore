@@ -8,3 +8,6 @@ python/.venv
 .venv/
 *.egg-info
 .pytest_cache
+
+# myco worktree mount point (created by `myco init`)
+project/
