@@ -8,25 +8,12 @@ date: 2026-08-22
 
 ## Working compiler pass
 
-- [x] Implement `synthesize_topology` as an actual AST-to-AST pass in a target language
-- [x] Handle precedence parsing (both explicit `before` relations and numeric priority sugar)
-- [x] Implement cycle detection with user-friendly error messages
-- [x] Implement deterministic tie-breaking for unrelated handlers (declaration order)
-- [x] Integration test: declarative input → verify generated AST nesting matches expected linear extension
 
 ## Case studies
 
-- [x] Case study 1: HTTP middleware pipeline (auth → cache → logging) — show declarative vs. manual nesting
-- [x] Case study 2: Event-driven handler chain with partial order (some handlers unordered)
-- [x] Case study 3: Cyclic precedence detection — verify compiler rejects with clear diagnostics
-- [x] Case study 4: Behavioral equivalence — run synthesized vs. manually nested programs, confirm identical output
-- [x] Document each case study with input spec, expected output, and verification method
 
 ## Evaluation infrastructure
 
-- [x] Build a test harness that generates random acyclic precedence graphs and verifies synthesis correctness
-- [x] Build a test harness that generates cyclic graphs and verifies rejection
-- [x] Property-based test: for any acyclic spec, synthesized nesting respects all precedence constraints
 
 ## Benchmarks
 
@@ -38,3 +25,20 @@ date: 2026-08-22
 ## Publication
 
 - [ ] Add arXiv/DOI badge and link to README once published
+
+## Handler commutativity (Sanada/DTS bridge) — open next steps
+
+- [ ] Formalize enough of Sanada's free strong promonad `A_Σ^*` and its `S`-parameterized interpretation `[[A → B]]_S = A_Σ^*([[A]]_S × S, [[B]]_S)` to represent a nontrivial operation-rewriting handler.
+- [ ] Define handler-induced `A_Σ^*`-algebra actions from clauses `Q_op` (`[[Q^op]]_S : A_Σ^*([[δ]] × S, [[D]]) → A_Σ^*([[γ]] × S, [[D]])`).
+- [ ] Instantiate the abstract `ProfunctorCommute2` diamond theorem with the concrete `get`/`log` handlers and prove disjoint operation clauses induce safe handler reordering.
+- [ ] Revisit `EffectBridge.lean` once the parameterized algebra infrastructure is in place.
+
+## Next steps surfaced from the 2026-10-30 formalization pass
+
+- [ ] Prove the full `List.Perm` generalization: for a static body and any permutation of a pairwise-disjoint handler list, `eval (synthesize body ordered) = eval (synthesize body ordered')`. The adjacent-swap step (`synthesize_adjacent_swap`) and the `eval_synthesize` bridge are already in place.
+- [ ] Complete the full Sanada arrow-calculus interpretation for every `Dts` command, beyond the two-handler bridge and the concrete `get`/`log` fragment.
+
+## Repo state (from 2026-10-29 cleanup)
+
+- [ ] Review `sanada-bridge` branch: holds rescued uncommitted work (EvalRel, EffectInterface, InferenceSoundness, extended Commutativity/Semantics diffs) not on `main` — integrate or discard
+- [ ] Repo is archived on GitHub — unarchive before any future push
