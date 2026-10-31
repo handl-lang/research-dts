@@ -22,8 +22,8 @@
 
 ## Handler commutativity (Sanada/DTS bridge) — open next steps
 
-- [ ] T-006 Formalize enough of Sanada's free strong promonad A_Σ^* and its S-parameterized interpretation [[A → B]]_S = A_Σ^*([[A]]_S × S, [[B]]_S) to represent a nontrivial operation-rewriting handler.
-- [ ] T-007 Define handler-induced A_Σ^*-algebra actions from clauses Q_op ([[Q^op]]_S : A_Σ^*([[δ]] × S, [[D]]) → A_Σ^*([[γ]] × S, [[D]])).
+- [ ] T-006 Formalize enough of Sanada's free strong promonad A_Σ^* and its S-parameterized interpretation ⟦A → B⟧_S = A_Σ^*(⟦A⟧_S × S, ⟦B⟧_S) to represent a nontrivial operation-rewriting handler.
+- [ ] T-007 Define handler-induced A_Σ^*-algebra actions from clauses Q_op (⟦Q^op⟧_S : A_Σ^*(⟦δ⟧ × S, ⟦D⟧) → A_Σ^*(⟦γ⟧ × S, ⟦D⟧)).
 - [ ] T-008 Instantiate the abstract ProfunctorCommute2 diamond theorem with the concrete get/log handlers and prove disjoint operation clauses induce safe handler reordering.
 - [ ] T-009 Revisit EffectBridge.lean once the parameterized algebra infrastructure is in place.
 
