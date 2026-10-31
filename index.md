@@ -1,4 +1,4 @@
-# project/ — research-dts work ledger
+# project/ — project work ledger
 
 Markdown here is canonical; `myco` verbs are the write path.
 

@@ -1,7 +1,7 @@
-name = "research-dts"
+name = "project"
 
 [next]
-t = 1
+t = 14
 i = 1
 p = 1
 adr = 1
